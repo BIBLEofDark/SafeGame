@@ -1,0 +1,4357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>雨夜长江航道趸船 - 安全隐患排查小游戏</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #090d16;
+      color: #f1f5f9;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    /* 顶部 HUD 状态栏 */
+    #hud-top {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(13, 22, 38, 0.86);
+      border: 1px solid rgba(96, 165, 250, 0.35);
+      backdrop-filter: blur(10px);
+      padding: 8px 16px;
+      border-radius: 999px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+      transition: opacity 0.3s, transform 0.3s;
+      max-width: 96vw;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    #hud-top.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -20px);
+    }
+    .hud-badge {
+      padding: 4px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #1d4ed8, #0284c7);
+      color: #fff;
+      white-space: nowrap;
+    }
+    .hud-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #e2e8f0;
+      white-space: nowrap;
+    }
+    .hud-stat strong {
+      font-size: 16px;
+      color: #fbbf24;
+      font-variant-numeric: tabular-nums;
+    }
+    .hud-stat.danger strong {
+      color: #f87171;
+      animation: pulseText 0.8s infinite alternate;
+    }
+    @keyframes pulseText {
+      from { opacity: 1; transform: scale(1); }
+      to { opacity: 0.55; transform: scale(1.08); }
+    }
+    .hud-divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(148, 163, 184, 0.28);
+    }
+    .hud-btn {
+      border: none;
+      outline: none;
+      background: rgba(30, 41, 59, 0.9);
+      color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      padding: 6px 13px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .hud-btn:hover {
+      background: rgba(51, 65, 85, 0.95);
+      border-color: #60a5fa;
+      transform: translateY(-1px);
+    }
+    .hud-btn:active {
+      transform: translateY(0);
+    }
+    .hud-btn.hint-btn {
+      background: linear-gradient(135deg, #d97706, #ea580c);
+      border-color: #fbbf24;
+      color: #fff;
+    }
+    .hud-btn.hint-btn:hover {
+      filter: brightness(1.1);
+    }
+    .hud-btn.hint-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* 底部快捷视角与已排查进度条 */
+    #hud-bottom {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(13, 22, 38, 0.82);
+      border: 1px solid rgba(96, 165, 250, 0.28);
+      backdrop-filter: blur(8px);
+      padding: 6px 12px;
+      border-radius: 999px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+      max-width: 96vw;
+      overflow-x: auto;
+      transition: opacity 0.3s;
+    }
+    #hud-bottom.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .cam-chip {
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(30, 41, 59, 0.85);
+      color: #cbd5e1;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .cam-chip:hover {
+      background: #1e40af;
+      color: #fff;
+      border-color: #60a5fa;
+    }
+
+    /* 纯享观赏模式浮动返回按钮 */
+    #free-view-bar {
+      position: fixed;
+      top: 14px;
+      right: 16px;
+      z-index: 25;
+      display: none;
+    }
+
+    /* 模态弹窗通用遮罩 */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(6, 11, 21, 0.72);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      opacity: 1;
+      transition: opacity 0.28s;
+    }
+    .modal-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .modal-card {
+      width: 100%;
+      max-width: 560px;
+      background: linear-gradient(165deg, rgba(16, 26, 46, 0.97), rgba(11, 18, 32, 0.98));
+      border: 1px solid rgba(96, 165, 250, 0.42);
+      border-radius: 20px;
+      padding: 26px 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-title {
+      font-size: 23px;
+      font-weight: 800;
+      color: #f8fafc;
+      text-align: center;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+    .modal-subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      text-align: center;
+      margin-bottom: 18px;
+      line-height: 1.5;
+    }
+
+    /* 难度选择卡片 */
+    .diff-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    /* 手机端界面紧凑化适配（防止菜单过大占比过高） */
+    @media (max-width: 640px) {
+      .modal-card {
+        padding: 13px 12px;
+        border-radius: 14px;
+        max-height: 86vh;
+      }
+      .modal-title {
+        font-size: 15px;
+        margin-bottom: 2px;
+      }
+      .modal-subtitle {
+        font-size: 11px;
+        line-height: 1.32;
+        margin-bottom: 8px;
+      }
+      .diff-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 5px;
+        margin-bottom: 8px;
+      }
+      .diff-card {
+        padding: 7px 4px;
+        border-radius: 8px;
+      }
+      .diff-name {
+        font-size: 12px;
+        margin-bottom: 2px;
+      }
+      .diff-info {
+        font-size: 10px;
+        line-height: 1.3;
+      }
+      .diff-tag {
+        font-size: 9px;
+        padding: 1px 4px;
+        margin-top: 3px;
+      }
+      .tips-box {
+        font-size: 10px;
+        padding: 6px 8px;
+        line-height: 1.38;
+        margin-bottom: 8px;
+      }
+      .secondary-btn, .primary-btn {
+        padding: 7px 10px;
+        font-size: 12px;
+      }
+      #hud-top {
+        top: 6px;
+        padding: 4px 8px;
+        gap: 5px;
+        max-width: 98vw;
+      }
+      .hud-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+      }
+      .hud-stat {
+        font-size: 11px;
+        gap: 3px;
+      }
+      .hud-stat strong {
+        font-size: 13px;
+      }
+      .hud-btn {
+        padding: 3px 7px;
+        font-size: 11px;
+      }
+      #hud-bottom {
+        bottom: 6px;
+        padding: 3px 6px;
+        gap: 4px;
+        max-width: 98vw;
+      }
+      .cam-chip {
+        font-size: 10px;
+        padding: 3px 6px;
+      }
+      .hazard-card {
+        padding: 12px;
+        max-height: 72vh;
+      }
+      .hazard-title {
+        font-size: 15px;
+        margin-bottom: 6px;
+      }
+      .hazard-section {
+        padding: 6px 8px;
+        margin-bottom: 6px;
+      }
+      .hazard-section-text {
+        font-size: 11.5px;
+        line-height: 1.38;
+      }
+    }
+
+    /* 资源加载进度与状态条 */
+    .loading-wrap {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(96, 165, 250, 0.35);
+      border-radius: 10px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      transition: opacity 0.4s;
+    }
+    .loading-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #93c5fd;
+      margin-bottom: 6px;
+    }
+    .loading-spinner {
+      width: 13px;
+      height: 13px;
+      border: 2px solid rgba(147, 197, 253, 0.25);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spinLoader 0.75s linear infinite;
+    }
+    @keyframes spinLoader {
+      to { transform: rotate(360deg); }
+    }
+    .progress-track {
+      width: 100%;
+      height: 5px;
+      background: rgba(30, 41, 59, 0.95);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 25%;
+      background: linear-gradient(90deg, #38bdf8, #10b981);
+      border-radius: 99px;
+      transition: width 0.35s ease;
+    }
+    .load-error-box {
+      background: rgba(127, 29, 29, 0.88);
+      border: 1px solid #f87171;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      color: #fee2e2;
+      font-size: 12px;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .retry-btn {
+      margin-top: 8px;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      padding: 5px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .retry-btn:hover {
+      filter: brightness(1.15);
+    }
+    .diff-card {
+      background: rgba(30, 41, 59, 0.75);
+      border: 1.5px solid rgba(148, 163, 184, 0.28);
+      border-radius: 14px;
+      padding: 14px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.22s;
+    }
+    .diff-card:hover {
+      transform: translateY(-3px);
+      border-color: #fbbf24;
+      background: rgba(30, 58, 95, 0.85);
+      box-shadow: 0 8px 20px rgba(251, 191, 36, 0.18);
+    }
+    .diff-name {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .diff-easy .diff-name { color: #34d399; }
+    .diff-normal .diff-name { color: #fbbf24; }
+    .diff-hard .diff-name { color: #f87171; }
+    .diff-info {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.65;
+    }
+    .diff-tag {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      background: rgba(15, 23, 42, 0.7);
+      color: #94a3b8;
+    }
+
+    .tips-box {
+      background: rgba(15, 23, 42, 0.75);
+      border-left: 3px solid #38bdf8;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      color: #cbd5e1;
+      line-height: 1.65;
+      margin-bottom: 14px;
+    }
+
+    /* 隐患详情与整改弹窗（靠右悬浮，不挡住画面中央的3D特写） */
+    #hazard-popup {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(6, 11, 21, 0.22);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 20px 28px;
+    }
+    @media (max-width: 640px) {
+      #hazard-popup {
+        justify-content: center;
+        align-items: flex-end;
+        padding: 12px;
+      }
+    }
+    #hazard-popup.hidden {
+      display: none;
+    }
+    .hazard-card {
+      width: 100%;
+      max-width: 410px;
+      background: linear-gradient(165deg, rgba(19, 32, 56, 0.96), rgba(12, 21, 38, 0.98));
+      border: 1.5px solid #f59e0b;
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      animation: popIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popIn {
+      from { transform: translateX(20px) scale(0.95); opacity: 0; }
+      to { transform: translateX(0) scale(1); opacity: 1; }
+    }
+    .hazard-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .hazard-id-badge {
+      background: #f59e0b;
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 12px;
+      padding: 3px 9px;
+      border-radius: 6px;
+    }
+    .hazard-stars {
+      font-size: 13px;
+      color: #fbbf24;
+      font-weight: 600;
+    }
+    .hazard-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: #fef08a;
+      margin-bottom: 12px;
+    }
+    .hazard-section {
+      background: rgba(15, 23, 42, 0.82);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+    .hazard-section-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .hazard-section-label.rectify {
+      color: #34d399;
+    }
+    .hazard-section-text {
+      font-size: 13px;
+      color: #e2e8f0;
+      line-height: 1.58;
+    }
+    .primary-btn {
+      width: 100%;
+      padding: 11px 16px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      font-size: 14.5px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: filter 0.2s, transform 0.1s;
+    }
+    .primary-btn:hover {
+      filter: brightness(1.08);
+    }
+    .primary-btn:active {
+      transform: scale(0.99);
+    }
+    .secondary-btn {
+      width: 100%;
+      padding: 9px 14px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 10px;
+      background: rgba(30, 41, 59, 0.7);
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .secondary-btn:hover {
+      background: rgba(51, 65, 85, 0.9);
+      color: #fff;
+    }
+
+    /* 结算复盘列表 */
+    .summary-list {
+      max-height: 250px;
+      overflow-y: auto;
+      margin: 12px 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-right: 4px;
+    }
+    .summary-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .summary-item:hover {
+      border-color: #60a5fa;
+    }
+    .summary-item .status-ok {
+      color: #34d399;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .summary-item .status-miss {
+      color: #f87171;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    /* 浮动轻提示 Toast */
+    #toast-msg {
+      position: fixed;
+      top: 74px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 70;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid #fbbf24;
+      color: #fef08a;
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+      white-space: nowrap;
+    }
+    #toast-msg.show {
+      opacity: 1;
+      transform: translate(-50%, 4px);
+    }
+  </style>
+  <script>
+    window.__APP_STATUS__ = { threeLoaded: false, orbitLoaded: false, sceneReady: false, error: null };
+    function updateLoadingProgress(percent, msg) {
+      const bar = document.getElementById('loading-bar');
+      const txt = document.getElementById('loading-text');
+      if (bar) bar.style.width = percent + '%';
+      if (txt && msg) txt.textContent = msg;
+    }
+    function reportEngineError(err) {
+      console.error('3D Engine Load/Init Error:', err);
+      const errBox = document.getElementById('loading-error-box');
+      const errMsg = document.getElementById('loading-error-msg');
+      const spinner = document.getElementById('loading-spinner');
+      if (spinner) spinner.style.display = 'none';
+      if (errMsg) errMsg.innerHTML = '⚠️ <strong>3D引擎资源载入或初始化异常：</strong><br/>' + (err.message || err) + '<br/><span style="font-size:11px;color:#cbd5e1;">（若因网络访问CDN受阻，可点击重试或刷新页面）</span>';
+      if (errBox) errBox.classList.remove('hidden');
+    }
+    // 监听网络加载全局失败
+    window.addEventListener('error', function(e) {
+      if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
+        reportEngineError(new Error('核心脚本资源下载失败: ' + (e.target.src || '未知资源')));
+      }
+    }, true);
+  </script>
+  <!-- Three.js Core with backup CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+          onload="window.__APP_STATUS__.threeLoaded = true; updateLoadingProgress(45, 'Three.js 核心引擎已载入 (45%)...');"
+          onerror="console.warn('cdnjs failed, fallback to jsdelivr...'); this.onerror=null; this.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';"></script>
+  <!-- OrbitControls with backup CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"
+          onload="window.__APP_STATUS__.orbitLoaded = true; updateLoadingProgress(75, '场景空间控制器就绪 (75%)...');"
+          onerror="console.warn('jsdelivr failed, fallback to cdnjs...'); this.onerror=null; this.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js';"></script>
+</head>
+<body>
+
+  <!-- 顶部游戏状态栏 -->
+  <div id="hud-top" class="hidden">
+    <span id="hud-diff-badge" class="hud-badge">简单模式</span>
+    <div class="hud-stat">
+      <span>🎯 隐患排查:</span>
+      <strong id="hud-progress">0 / 6</strong>
+    </div>
+    <div class="hud-divider"></div>
+    <div id="hud-timer-box" class="hud-stat">
+      <span>⏱️ 剩余时间:</span>
+      <strong id="hud-timer">02:30</strong>
+    </div>
+    <div class="hud-divider"></div>
+    <button id="btn-hint" class="hud-btn hint-btn" title="消耗15秒剩余时间，高亮并转向1个未发现隐患3秒">
+      💡 提示 (-15s)
+    </button>
+    <button id="btn-list" class="hud-btn" title="查看本局已排查的隐患记录">
+      📋 记录
+    </button>
+    <button id="btn-menu" class="hud-btn" title="切换难度或重新开始">
+      ⚙️ 菜单
+    </button>
+  </div>
+
+  <!-- 底部快捷观察视角 -->
+  <div id="hud-bottom" class="hidden">
+    <span style="font-size:12px;color:#94a3b8;padding:0 4px;">快捷视角:</span>
+    <button class="cam-chip" data-view="overview">🚢 全景俯视</button>
+    <button class="cam-chip" data-view="gangway">🌉 走进引桥</button>
+    <button class="cam-chip" data-view="deck1">⚓ 一楼前甲板</button>
+    <button class="cam-chip" data-view="leftSide">🔌 左侧配电/前舱</button>
+    <button class="cam-chip" data-view="floor2">🏠 二楼宿舍走廊</button>
+    <button class="cam-chip" data-view="rightSide">🪜 右侧逃生梯道</button>
+  </div>
+
+  <!-- 纯享观赏模式右上角返回按钮 -->
+  <div id="free-view-bar">
+    <button id="btn-exit-free" class="hud-btn" style="background:rgba(15,23,42,0.85);">
+      🎮 开启隐患排查游戏
+    </button>
+  </div>
+
+  <!-- 轻提示 Toast -->
+  <div id="toast-msg">提示信息</div>
+
+  <!-- 开始与难度选择弹窗 -->
+  <div id="start-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-title">🚢 雨夜长江航道趸船 · 安全隐患排查</div>
+      <div class="modal-subtitle">
+        每局从航道趸船典型生产生活隐患题库中随机抽取。<br/>
+        自由旋转、缩放推进镜头，找出潜藏在雨夜趸船各处的安全隐患！
+      </div>
+
+      <!-- 资源加载进度与状态提示（解决电脑端点击没反应的问题） -->
+      <div id="loading-bar-wrap" class="loading-wrap">
+        <div class="loading-status">
+          <span class="loading-spinner" id="loading-spinner"></span>
+          <span id="loading-text">正在加载 3D 渲染引擎与微缩模型资源...</span>
+        </div>
+        <div class="progress-track">
+          <div id="loading-bar" class="progress-fill" style="width: 25%;"></div>
+        </div>
+      </div>
+      <div id="loading-error-box" class="load-error-box hidden">
+        <div id="loading-error-msg">⚠️ 3D引擎网络资源加载受阻，请检查网络连接！</div>
+        <button id="btn-retry-load" class="retry-btn" onclick="location.reload();">🔄 重新载入</button>
+      </div>
+
+      <div class="diff-grid">
+        <div class="diff-card diff-easy" data-diff="easy">
+          <div class="diff-name">🌱 简单模式</div>
+          <div class="diff-info">
+            抽查 <strong>6 个</strong> 隐患<br/>
+            限时 <strong>2.5 分钟</strong>
+          </div>
+          <span class="diff-tag">🟠 橙色脉冲球提示</span>
+        </div>
+
+        <div class="diff-card diff-normal" data-diff="normal">
+          <div class="diff-name">⚓ 普通模式</div>
+          <div class="diff-info">
+            抽查 <strong>8 个</strong> 隐患<br/>
+            限时 <strong>1分45秒</strong>
+          </div>
+          <span class="diff-tag">🟠 橙色脉冲球提示</span>
+        </div>
+
+        <div class="diff-card diff-hard" data-diff="hard">
+          <div class="diff-name">🔥 困难模式</div>
+          <div class="diff-info">
+            抽查 <strong>10 个</strong> 隐患<br/>
+            限时 <strong>1分15秒</strong>
+          </div>
+          <span class="diff-tag" style="color:#fca5a5;">🚫 无任何视觉提示</span>
+        </div>
+      </div>
+
+      <div class="tips-box">
+        <strong>🕹️ 排查操作指南：</strong><br/>
+        • <strong>旋转/平移</strong>：鼠标左键拖拽旋转，右键拖拽平移（手机单指旋转、双指平移）。<br/>
+        • <strong>全方位巡检</strong>：滚轮缩放（手机双指捏合）或点击底部<strong>【快捷视角】</strong>，可走进引桥、绕到左舷查看配电箱与前舱盖、或绕到右舷查看逃生梯。<br/>
+        • <strong>点击整改</strong>：点击隐患物体即可适度拉近查看详情，确认整改后镜头会自动恢复原位。
+      </div>
+
+      <button id="btn-free-mode" class="secondary-btn">
+        🌧️ 进入纯享微缩景观模式（隐藏所有UI与标记）
+      </button>
+    </div>
+  </div>
+
+  <!-- 找到隐患后的说明与整改建议弹窗 -->
+  <div id="hazard-popup" class="hidden">
+    <div class="hazard-card">
+      <div class="hazard-header">
+        <span id="pop-id" class="hazard-id-badge">H01</span>
+        <span id="pop-stars" class="hazard-stars">⭐ 易 · 无需进入模型</span>
+      </div>
+      <div id="pop-title" class="hazard-title">右舷射灯接触不良</div>
+
+      <div class="hazard-section">
+        <div class="hazard-section-label">⚠️ 隐患风险说明</div>
+        <div id="pop-desc" class="hazard-section-text"></div>
+      </div>
+
+      <div class="hazard-section">
+        <div class="hazard-section-label rectify">🛠️ 标准整改建议</div>
+        <div id="pop-rectify" class="hazard-section-text"></div>
+      </div>
+
+      <button id="btn-confirm-rectify" class="primary-btn">✅ 立即现场整改并恢复视角</button>
+    </div>
+  </div>
+
+  <!-- 游戏结算 / 已排查记录弹窗 -->
+  <div id="result-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div id="res-title" class="modal-title">🎉 隐患全部肃清！</div>
+      <div id="res-subtitle" class="modal-subtitle"></div>
+      <div id="res-list" class="summary-list"></div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button id="btn-res-close" class="secondary-btn" style="flex:1;">👁️ 留在场景查看</button>
+        <button id="btn-res-restart" class="primary-btn" style="flex:1;margin-top:0;">🔄 再玩一局 / 换难度</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+window.onload = function () {
+  try {
+    updateLoadingProgress(85, '正在初始化3D高精材质与航道场景...');
+  // ============================================================================
+  // 0. 安全隐患题库定义（涵盖生活、电气、消防、高空与航道标识等典型隐患）
+  // ============================================================================
+  const HAZARD_DATABASE = [
+    {
+      id: 'H01',
+      name: '右舷射灯接触不良',
+      stars: '⭐ 易',
+      needEnter: '否（二楼右舷前侧）',
+      markerPos: new THREE.Vector3(10.8, 3.85, 3.85),
+      camPos: new THREE.Vector3(17.5, 6.4, 12.2),
+      camTarget: new THREE.Vector3(10.5, 3.3, 3.4),
+      desc: '二楼右舷前侧照明射灯线路绝缘老化、接头受潮松动，在雨夜出现频闪并伴随电火花，不仅影响船员夜间巡检视线，更易引发船体漏电或电气短路火灾。',
+      rectify: '立即切断该路照明电源，更换符合船用防水等级（IP66及以上）的防潮接线盒与灯具，锁紧电缆防水格兰头并做绝缘测试。'
+    },
+    {
+      id: 'H02',
+      name: '消防器材被遮挡',
+      stars: '⭐ 易',
+      needEnter: '否（一楼正门右侧）',
+      markerPos: new THREE.Vector3(1.45, 2.35, 3.15),
+      camPos: new THREE.Vector3(3.2, 4.2, 11.5),
+      camTarget: new THREE.Vector3(1.45, 1.5, 2.8),
+      desc: '一层正门右侧红色消防栓箱前违规堆放了多个蓝色周转箱、帆布包及杂物纸箱，将消防箱门挡住，一旦发生火情将严重延误水带铺设与扑救时机。',
+      rectify: '立即搬离消防栓箱前1.5米范围内的所有遮挡物资，在消防箱前施划黄色禁放警戒区域，严格执行消防设施无遮挡制度。'
+    },
+    {
+      id: 'H03',
+      name: '甲板积水未清理',
+      stars: '⭐⭐ 中',
+      needEnter: '否（一楼左前甲板）',
+      markerPos: new THREE.Vector3(-4.8, 1.35, 3.65),
+      camPos: new THREE.Vector3(-5.5, 5.2, 12.0),
+      camTarget: new THREE.Vector3(-4.8, 0.9, 3.5),
+      desc: '一层左前甲板主通行区因排水孔被落叶油泥堵塞，形成大面积积水与油膜反光，船员雨夜巡检交接班时极易滑倒摔伤。',
+      rectify: '立即疏通甲板排水孔（落水洞），使用推水刮板与吸油毡彻底清除积水油污，保持甲板巡检通道干爽防滑。'
+    },
+    {
+      id: 'H04',
+      name: '甲板杂物堆积',
+      stars: '⭐⭐ 中',
+      needEnter: '否（一楼右前甲板）',
+      markerPos: new THREE.Vector3(6.6, 1.55, 3.45),
+      camPos: new THREE.Vector3(8.8, 5.2, 12.2),
+      camTarget: new THREE.Vector3(6.6, 1.1, 3.3),
+      desc: '一层右前甲板巡检走道上杂乱堆放着废旧防撞轮胎、散乱麻绳卷、空油漆桶与破损木托盘，严重挤占安全作业通道，夜间极易绊倒船员。',
+      rectify: '推行甲板6S定置管理，将备用缆绳盘入专用防潮收纳架，废旧油漆桶与旧轮胎分类清运上岸，确保通道畅通。'
+    },
+    {
+      id: 'H05',
+      name: '配电箱盖未关闭',
+      stars: '⭐⭐⭐ 难',
+      needEnter: '需绕到左侧（一楼左侧舱壁）',
+      markerPos: new THREE.Vector3(-9.8, 2.55, 0.6),
+      camPos: new THREE.Vector3(-17.8, 4.2, 3.2),
+      camTarget: new THREE.Vector3(-9.4, 2.0, 0.6),
+      desc: '一层左侧舱壁外挂的船用动力配电箱门敞开未锁，内部断路器与汇流铜排直接暴露在雨夜潮湿空气中，雨水飘入极易造成短路跳闸或人员误触电。',
+      rectify: '立即合上配电箱防护门并锁紧防水锁扣，检查箱门橡胶密封条完好性，张贴“当心触电、随手关门”安全警示标识。'
+    },
+    {
+      id: 'H06',
+      name: '灭火器已过期',
+      stars: '⭐⭐ 中',
+      needEnter: '需靠近（二楼走廊中柱旁）',
+      markerPos: new THREE.Vector3(0.0, 4.25, 2.75),
+      camPos: new THREE.Vector3(1.2, 5.2, 9.8),
+      camTarget: new THREE.Vector3(0.0, 3.7, 2.5),
+      desc: '二楼宿舍走廊中央立柱旁配置的手提式干粉灭火器歪倒、压力表指针跌入红区失压，且挂着泛黄的逾期未检标签，初起火灾时无法正常喷射。',
+      rectify: '立即更换为压力处于绿区、在检验有效期内的合格灭火器，稳固安放在专用托架上，并落实每月一次的消防器材点检签字。'
+    },
+    {
+      id: 'H07',
+      name: '走廊护栏缺口',
+      stars: '⭐ 易',
+      needEnter: '否（二楼前走廊左侧）',
+      markerPos: new THREE.Vector3(-6.3, 4.15, 3.55),
+      camPos: new THREE.Vector3(-7.2, 6.0, 12.2),
+      camTarget: new THREE.Vector3(-6.3, 3.7, 3.4),
+      desc: '二楼船员宿舍外走廊临江侧有一段白色铁艺护栏断裂缺失，形成近2米宽的临空豁口且无任何临时拦阻措施，船员夜间出舱极易发生坠江险情。',
+      rectify: '立即在护栏缺口处拉设临时安全警戒链，并安排专业焊工按内河船检规范修复焊牢护栏（高度不低于1.0米）。'
+    },
+    {
+      id: 'H08',
+      name: '救生圈老化损坏',
+      stars: '⭐⭐ 中',
+      needEnter: '否（一楼左前侧外端栏杆）',
+      markerPos: new THREE.Vector3(-11.5, 1.75, 4.95),
+      camPos: new THREE.Vector3(-12.5, 3.8, 12.5),
+      camTarget: new THREE.Vector3(-11.5, 1.25, 4.95),
+      desc: '一层左前侧栏杆外端悬挂的救生圈因长期风吹日晒严重发灰霉变、圈体开裂露出内部泡沫芯且反光带剥落，落水施救时浮力不足且夜间难以搜寻。',
+      rectify: '立即报废拆下老化破损救生圈，更换符合船检标准的鲜亮国际橙色救生圈，配齐合格反光带与救生浮索。'
+    },
+    {
+      id: 'H09',
+      name: '引桥口无安全防护',
+      stars: '⭐⭐ 中',
+      needEnter: '需走进引桥（引桥前端接岸口）',
+      markerPos: new THREE.Vector3(0.0, 1.55, 14.2),
+      camPos: new THREE.Vector3(4.5, 4.2, 21.5),
+      camTarget: new THREE.Vector3(0.0, 1.1, 14.2),
+      desc: '引桥前端与接岸浮箱衔接处的登船坡道两侧缺失安全护栏，安全提示牌倒伏在地，雨夜江水涨落引桥摇晃时，上下趸船人员极易失足落水。',
+      rectify: '在引桥登船口两侧加装黄黑钢管防护栏杆，扶正并加固“请穿救生衣”夜光安全警示立牌。'
+    },
+    {
+      id: 'H10',
+      name: '前舱盖板未关',
+      stars: '⭐⭐ 中',
+      needEnter: '否（一楼左前甲板前舱口）',
+      markerPos: new THREE.Vector3(-11.2, 1.65, 1.5),
+      camPos: new THREE.Vector3(-16.8, 5.2, 7.8),
+      camTarget: new THREE.Vector3(-11.2, 1.0, 1.5),
+      desc: '一楼左前甲板的前舱水密盖板处于掀开未关状态，爬梯外露且四周未设护栏，不仅导致雨水灌入底舱影响船体稳性，夜间巡检人员更极易踏空坠入深舱。',
+      rectify: '立即放平合上前舱水密钢盖板并旋紧中央手轮与四周锁扣，确保风雨密闭与甲板通行安全。'
+    },
+    {
+      id: 'H12',
+      name: '逃生梯道被占用',
+      stars: '⭐⭐⭐ 难',
+      needEnter: '需绕到右侧（一至二楼外部斜梯）',
+      markerPos: new THREE.Vector3(9.4, 2.35, 1.3),
+      camPos: new THREE.Vector3(17.8, 4.8, 5.5),
+      camTarget: new THREE.Vector3(9.4, 2.0, 1.1),
+      desc: '绕到船体右侧可见，连接一楼甲板与二楼宿舍的外部应急逃生斜梯上违规堆放了废机油铁桶与木箱，严重堵塞上下层应急疏散生命通道。',
+      rectify: '立即清走逃生斜梯及梯口平台上的所有油桶与木箱，严禁占用应急通道储物，并在梯旁舱壁增设“安全逃生梯”醒目标识。'
+    },
+    {
+      id: 'H13',
+      name: '值班室电热水壶干烧冒烟且无人看管',
+      stars: '⭐⭐ 中',
+      needEnter: '否（三楼值班室室内台面）',
+      markerPos: new THREE.Vector3(0.0, 7.3, 0.0),
+      camPos: new THREE.Vector3(0.0, 7.6, 3.8),
+      camTarget: new THREE.Vector3(0.0, 6.75, -0.15),
+      desc: '三楼航道值班室内操作台上，大功率电热水壶长时间处于通电干烧状态，壶盖水汽与白烟不断外溢冒烟，且值班人员脱岗离岗无人看管，极易导致内部加热盘烧熔引发舱室火灾。',
+      rectify: '立即拔下电热水壶电源插头，严禁使用无防干烧断电保护的老化电热器具；严格执行值班脱岗违纪问责制，落实离室断电防火规程。'
+    },
+    {
+      id: 'H14',
+      name: '二层走廊倚靠护栏打手机分神',
+      stars: '⭐ 易',
+      needEnter: '否（二楼前走廊右侧外栏杆）',
+      markerPos: new THREE.Vector3(4.5, 4.4, 4.1),
+      camPos: new THREE.Vector3(5.8, 5.5, 8.5),
+      camTarget: new THREE.Vector3(4.5, 4.2, 4.1),
+      desc: '雨夜二楼外侧湿滑走廊处，人员违规将身体大幅度倚靠在前沿湿滑护栏上打手机聊天，雨天湿滑且江水风浪摇晃，极易因重心失稳翻出护栏跌入滚滚长江。',
+      rectify: '立即上前劝导制止倚靠护栏的危险行为，责令进入舱内安全地带接听；在走廊护栏显眼位置增设“严禁倚靠 · 当心坠江”夜光反光安全警示标牌。'
+    },
+    {
+      id: 'H15',
+      name: '顶楼“长江航道”发光字单字故障不亮',
+      stars: '⭐ 易',
+      needEnter: '否（三楼顶层大型标识牌）',
+      markerPos: new THREE.Vector3(1.85, 9.4, 0.8),
+      camPos: new THREE.Vector3(1.85, 10.2, 7.8),
+      camTarget: new THREE.Vector3(1.85, 9.2, 0.8),
+      desc: '趸船顶层“長江航道”大型夜景霓虹发光招牌中，“航”字由于内部高压LED电源进水烧毁导致单字熄灭不亮，不仅破坏国家航道形象公信力，且存在内部电路受潮漏电短路隐患。',
+      rectify: '立即断开顶层招牌配电回路，拆开“航”字灯箱背板更换防雨型高压驱动电源，重新涂抹硅橡胶防水密封胶，测试全套字体均匀通亮无闪烁。'
+    },
+    {
+      id: 'H16',
+      name: '一层侧面应急太平斧缺失',
+      stars: '⭐ 易',
+      needEnter: '否（一层右侧外壁应急消防位）',
+      markerPos: new THREE.Vector3(9.5, 2.3, -1.2),
+      camPos: new THREE.Vector3(15.2, 3.6, 1.2),
+      camTarget: new THREE.Vector3(9.4, 2.0, -1.2),
+      desc: '一层右舷外侧舱壁标有“太平斧”专用标语的破拆消防架上，关键应急破拆装备“消防太平斧”缺失不在位（仅剩空托架），一旦发生火情受困或应急断缆时将完全无法开展破拆施救。',
+      rectify: '立即按船舶消防规范配齐标准长柄绝缘手柄消防太平斧，刃部套好防护皮套，打上铅封或点检签，严禁擅自移作他用。'
+    },
+    {
+      id: 'H17',
+      name: '三楼外壁电线破损裸露跳火',
+      stars: '⭐⭐ 中',
+      needEnter: '否（三楼会议室左侧外墙）',
+      markerPos: new THREE.Vector3(-5.5, 7.5, 0.4),
+      camPos: new THREE.Vector3(-10.8, 8.6, 4.8),
+      camTarget: new THREE.Vector3(-5.35, 7.2, 0.4),
+      desc: '三楼会议室左侧外墙配电线路绝缘套管严重老化开裂破损，内部动力电缆铜线裸露在外，在雨水淋湿下持续剧烈跳出蓝色电火花，存在严重的金属船体漏电与电气起火爆炸危险。',
+      rectify: '立即拉闸切断该路供电，拆除破损电线并重新穿设重型镀锌金属防雨穿线管，更换船用耐腐蚀交联阻燃电缆并加装漏电保护断路器。'
+    }
+  ];
+
+  // ============================================================================
+  // 1. 场景、相机与渲染器初始化
+  // ============================================================================
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a101d);
+  scene.fog = new THREE.FogExp2(0x0a101d, 0.0082);
+
+  const camera = new THREE.PerspectiveCamera(
+    36,
+    window.innerWidth / window.innerHeight,
+    0.4,
+    300
+  );
+
+  // 初始俯视 30° 视角
+  const dist = 44;
+  const pitchRad = THREE.MathUtils.degToRad(30);
+  const yawRad = THREE.MathUtils.degToRad(16);
+  const defaultCamPos = new THREE.Vector3(
+    Math.sin(yawRad) * Math.cos(pitchRad) * dist,
+    Math.sin(pitchRad) * dist + 2.5,
+    Math.cos(yawRad) * Math.cos(pitchRad) * dist
+  );
+  const defaultCamTarget = new THREE.Vector3(0, 3.3, 1.5);
+  camera.position.copy(defaultCamPos);
+
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: 'high-performance'
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.12;
+  document.body.appendChild(renderer.domElement);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.copy(defaultCamTarget);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.minDistance = 4.0;
+  controls.maxDistance = 85;
+  controls.maxPolarAngle = Math.PI / 2 - 0.03;
+  controls.minPolarAngle = 0.1;
+  controls.update();
+
+  // 平滑相机过渡动画与视角保存/恢复机制
+  let camTransition = null;
+  let savedCameraState = null; // 保存点击隐患前的视角，用于整改后恢复
+
+  function flyCameraTo(targetPos, lookAtPos, duration = 0.85) {
+    camTransition = {
+      startPos: camera.position.clone(),
+      endPos: targetPos.clone(),
+      startTarget: controls.target.clone(),
+      endTarget: lookAtPos.clone(),
+      elapsed: 0,
+      duration
+    };
+  }
+
+  // ============================================================================
+  // 2. 三渲二（Cel-Shading）核心材质与卡通描边工具
+  // ============================================================================
+  function createToonGradientMap() {
+    const data = new Uint8Array([
+      65, 72, 95, 255,
+      125, 135, 160, 255,
+      195, 202, 218, 255,
+      250, 252, 255, 255
+    ]);
+    const texture = new THREE.DataTexture(data, 4, 1, THREE.RGBAFormat);
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.needsUpdate = true;
+    return texture;
+  }
+  const toonGradient = createToonGradientMap();
+
+  function makeToonMat(color, opts = {}) {
+    return new THREE.MeshToonMaterial({
+      color: color,
+      gradientMap: toonGradient,
+      transparent: opts.transparent || false,
+      opacity: opts.opacity !== undefined ? opts.opacity : 1.0,
+      emissive: opts.emissive !== undefined ? new THREE.Color(opts.emissive) : new THREE.Color(0x000000),
+      emissiveIntensity: opts.emissiveIntensity !== undefined ? opts.emissiveIntensity : 0.0,
+      map: opts.map || null,
+      side: opts.side || THREE.FrontSide
+    });
+  }
+
+  const outlineLineMat = new THREE.LineBasicMaterial({
+    color: 0x111726,
+    transparent: true,
+    opacity: 0.72
+  });
+
+  const warmOutlineLineMat = new THREE.LineBasicMaterial({
+    color: 0x3a2418,
+    transparent: true,
+    opacity: 0.65
+  });
+
+  function addOutline(mesh, threshold = 22, isWarm = false) {
+    if (!mesh.geometry) return mesh;
+    const edges = new THREE.EdgesGeometry(mesh.geometry, threshold);
+    const line = new THREE.LineSegments(edges, isWarm ? warmOutlineLineMat : outlineLineMat);
+    mesh.add(line);
+    return mesh;
+  }
+
+  const hullOutlineMat = new THREE.MeshBasicMaterial({
+    color: 0x131926,
+    side: THREE.BackSide
+  });
+  function addHullOutline(mesh, scaleFactor = 1.06) {
+    const outlineMesh = new THREE.Mesh(mesh.geometry, hullOutlineMat);
+    outlineMesh.scale.setScalar(scaleFactor);
+    mesh.add(outlineMesh);
+    return mesh;
+  }
+
+  function createToonBox(w, h, d, mat, outlineThreshold = 20, isWarm = false, castShadow = true) {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = castShadow;
+    mesh.receiveShadow = true;
+    addOutline(mesh, outlineThreshold, isWarm);
+    return mesh;
+  }
+
+  // ============================================================================
+  // 3. 程序化纹理生成（含标语自适应字号优化，严防超出边框）
+  // ============================================================================
+  function createHazardTexture(repeatX = 16) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#eab308';
+    ctx.fillRect(0, 0, 256, 64);
+    ctx.fillStyle = '#171923';
+    for (let i = -64; i < 320; i += 32) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i + 16, 0);
+      ctx.lineTo(i - 16, 64);
+      ctx.lineTo(i - 32, 64);
+      ctx.closePath();
+      ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repeatX, 1);
+    return tex;
+  }
+
+  function createGreenGangwayTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#256f5c';
+    ctx.fillRect(0, 0, 512, 512);
+
+    for (let i = 0; i < 4500; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.09)';
+      ctx.fillRect(Math.random() * 512, Math.random() * 512, 3, 3);
+    }
+
+    ctx.strokeStyle = '#194f40';
+    ctx.lineWidth = 6;
+    for (let y = 24; y < 512; y += 32) {
+      ctx.beginPath();
+      ctx.moveTo(20, y);
+      ctx.lineTo(130, y);
+      ctx.lineTo(175, y - 10);
+      ctx.lineTo(256, y);
+      ctx.lineTo(337, y - 10);
+      ctx.lineTo(382, y);
+      ctx.lineTo(492, y);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#36937b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(20, y - 3);
+      ctx.lineTo(130, y - 3);
+      ctx.lineTo(175, y - 13);
+      ctx.lineTo(256, y - 3);
+      ctx.lineTo(337, y - 13);
+      ctx.lineTo(382, y - 3);
+      ctx.lineTo(492, y - 3);
+      ctx.stroke();
+      ctx.strokeStyle = '#194f40';
+      ctx.lineWidth = 6;
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
+  function createCalligraphyCharTexture(char) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 256, 256);
+
+    ctx.font = '900 180px "Kaiti", "STKaiti", "KaiTi", "Microsoft YaHei", serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.lineWidth = 18;
+    ctx.strokeStyle = '#e2f1ff';
+    ctx.strokeText(char, 128, 134);
+
+    ctx.fillStyle = '#123e75';
+    ctx.fillText(char, 128, 134);
+
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  function createWaterwayLogoTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    ctx.beginPath();
+    ctx.arc(256, 256, 240, 0, Math.PI * 2);
+    ctx.fillStyle = '#f0f7ff';
+    ctx.fill();
+    ctx.lineWidth = 16;
+    ctx.strokeStyle = '#164e87';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(256, 256, 175, 0, Math.PI * 2);
+    ctx.fillStyle = '#164e87';
+    ctx.fill();
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.moveTo(130, 330);
+    ctx.quadraticCurveTo(256, 240, 382, 330);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(155, 370);
+    ctx.quadraticCurveTo(256, 290, 357, 370);
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(246, 275);
+    ctx.lineTo(266, 275);
+    ctx.lineTo(260, 145);
+    ctx.lineTo(252, 145);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(256, 132, 14, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd166';
+    ctx.fill();
+
+    ctx.fillStyle = '#164e87';
+    ctx.font = 'bold 34px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('长 江 航 道', 256, 56);
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText('CHANGJIANG WATERWAY', 256, 462);
+
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  // 优化：标牌字号自适应缩小并限制最大绘制宽度，确保文字绝不超出边框界限
+  function createSignTexture(text, bgColor, textColor, borderColor, width = 256, height = 96) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, width, height);
+
+    const pad = 10;
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(pad, pad, width - pad * 2, height - pad * 2);
+
+    const innerMaxW = width - pad * 2 - 20;
+    const charLen = Math.max(text.length, 4);
+    const fontSizeByHeight = Math.floor(height * 0.33);
+    const fontSizeByWidth = Math.floor(innerMaxW / (charLen * 0.92));
+    const fontSize = Math.min(fontSizeByHeight, fontSizeByWidth);
+
+    ctx.fillStyle = textColor;
+    ctx.font = `bold ${fontSize}px "Microsoft YaHei", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, width / 2, height / 2 + 1, innerMaxW);
+
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  // ============================================================================
+  // 4. 灯光系统
+  // ============================================================================
+  const hemiLight = new THREE.HemisphereLight(0x283e66, 0x0b1322, 0.75);
+  scene.add(hemiLight);
+
+  const dirLight = new THREE.DirectionalLight(0x4f74a8, 0.6);
+  dirLight.position.set(-18, 28, 22);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.camera.near = 5;
+  dirLight.shadow.camera.far = 80;
+  const dCam = 22;
+  dirLight.shadow.camera.left = -dCam;
+  dirLight.shadow.camera.right = dCam;
+  dirLight.shadow.camera.top = dCam;
+  dirLight.shadow.camera.bottom = -dCam;
+  dirLight.shadow.bias = -0.0005;
+  scene.add(dirLight);
+
+  // ============================================================================
+  // 5. 微缩景观底座与动态水面
+  // ============================================================================
+  const dioramaGroup = new THREE.Group();
+  scene.add(dioramaGroup);
+
+  const waterWidth = 40;
+  const waterDepth = 30;
+
+  const baseFrameGroup = new THREE.Group();
+  const basePlateMat = makeToonMat(0x0d1522);
+  const basePlate = new THREE.Mesh(new THREE.BoxGeometry(waterWidth + 0.6, 1.3, waterDepth + 0.6), basePlateMat);
+  basePlate.position.set(0, -1.15, 2.5);
+  addOutline(basePlate, 25);
+  baseFrameGroup.add(basePlate);
+
+  const brassTrimMat = new THREE.MeshBasicMaterial({ color: 0x7c6238 });
+  const brassTrim = new THREE.Mesh(new THREE.BoxGeometry(waterWidth + 0.72, 0.08, waterDepth + 0.72), brassTrimMat);
+  brassTrim.position.set(0, -0.58, 2.5);
+  baseFrameGroup.add(brassTrim);
+  dioramaGroup.add(baseFrameGroup);
+
+  const waterGeo = new THREE.PlaneGeometry(waterWidth, waterDepth, 120, 90);
+  waterGeo.rotateX(-Math.PI / 2);
+
+  const waterUniforms = {
+    uTime: { value: 0 },
+    uFlicker: { value: 1.0 }
+  };
+
+  const waterShaderMat = new THREE.ShaderMaterial({
+    uniforms: waterUniforms,
+    transparent: true,
+    vertexShader: `
+      uniform float uTime;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      varying float vWaveHeight;
+
+      void main() {
+        vUv = uv;
+        vec3 pos = position;
+        float w1 = sin(pos.x * 0.55 + uTime * 1.8) * cos(pos.z * 0.45 + uTime * 1.4) * 0.12;
+        float w2 = sin(pos.x * 1.3 - uTime * 2.4 + pos.z * 0.9) * 0.05;
+        pos.y += w1 + w2;
+        vWaveHeight = w1 + w2;
+        vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
+        vWorldPos = worldPosition.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uFlicker;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      varying float vWaveHeight;
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      float rainRipple(vec2 uv, float scale, float timeOffset) {
+        vec2 st = uv * scale;
+        vec2 id = floor(st);
+        vec2 f = fract(st) - 0.5;
+        float h = hash(id);
+        float t = fract(uTime * 0.85 + h * 6.28 + timeOffset);
+        float radius = t * 0.45;
+        float ring = smoothstep(0.05, 0.0, abs(length(f) - radius)) * (1.0 - t);
+        return ring * step(0.55, h);
+      }
+
+      void main() {
+        vec3 deepColor = vec3(0.05, 0.11, 0.19);
+        vec3 midColor  = vec3(0.08, 0.18, 0.28);
+        vec3 crestColor = vec3(0.16, 0.30, 0.43);
+
+        float waveStep = smoothstep(-0.08, 0.08, vWaveHeight);
+        vec3 waterCol = mix(deepColor, midColor, step(0.35, waveStep));
+        waterCol = mix(waterCol, crestColor, step(0.76, waveStep));
+
+        float rippleDistort = sin(vWorldPos.z * 3.5 + uTime * 4.2) * 0.35
+                            + cos(vWorldPos.x * 2.8 - uTime * 3.1) * 0.25;
+
+        float zFrontDist = vWorldPos.z - 4.2;
+        if (zFrontDist > 0.0 && zFrontDist < 12.0) {
+          float fadeZ = 1.0 - smoothstep(0.0, 11.5, zFrontDist);
+          float wx = vWorldPos.x + rippleDistort * 0.55;
+          float r1 = exp(-pow((wx + 6.3) * 0.65, 2.0));
+          float r2 = exp(-pow((wx + 2.1) * 0.65, 2.0));
+          float r3 = exp(-pow((wx - 2.1) * 0.65, 2.0));
+          float r4 = exp(-pow((wx - 6.3) * 0.65, 2.0));
+          float windowGlow = (r1 + r2 + r3 + r4) * fadeZ;
+          float stripeMask = step(0.42, sin(vWorldPos.z * 5.0 - uTime * 5.5) * 0.5 + 0.5);
+          vec3 warmReflect = vec3(1.0, 0.66, 0.24) * (windowGlow * 0.65 + windowGlow * stripeMask * 0.55);
+          waterCol += warmReflect;
+        }
+
+        float leftSpot = exp(-length(vWorldPos.xz - vec2(-13.2 + rippleDistort * 0.3, 2.0)) * 0.28);
+        float rightSpot = exp(-length(vWorldPos.xz - vec2(13.2 + rippleDistort * 0.3, 2.0)) * 0.28) * uFlicker;
+        waterCol += vec3(1.0, 0.72, 0.30) * (leftSpot + rightSpot) * 0.55;
+
+        float hullMask = smoothstep(0.0, 2.2, max(abs(vWorldPos.x) - 14.2, abs(vWorldPos.z + 0.5) - 5.2));
+        waterCol *= mix(0.45, 1.0, hullMask);
+
+        float ripples = rainRipple(vUv, 14.0, 0.0) + rainRipple(vUv, 22.0, 1.7);
+        waterCol = mix(waterCol, vec3(0.55, 0.75, 0.92), clamp(ripples * 0.75, 0.0, 1.0));
+
+        gl_FragColor = vec4(waterCol, 0.96);
+      }
+    `
+  });
+
+  const waterMesh = new THREE.Mesh(waterGeo, waterShaderMat);
+  waterMesh.position.set(0, -0.45, 2.5);
+  dioramaGroup.add(waterMesh);
+
+  // ============================================================================
+  // 6. 趸船主体结构与生活生产安全设施（统一提前声明全部共享材质）
+  // ============================================================================
+  const boatGroup = new THREE.Group();
+  dioramaGroup.add(boatGroup);
+
+  const matHullDark = makeToonMat(0x212936);
+  const matHullBlack = makeToonMat(0x141922);
+  const matDeckGrey = makeToonMat(0x465362);
+  const matDeckWet = makeToonMat(0x364354);
+  const matCabinWhite = makeToonMat(0xdce5f0);
+  const matNavBlue = makeToonMat(0x164a84);
+  const matRoofBlue = makeToonMat(0x2563a6);
+  const matFrameSilver = makeToonMat(0x94a3b8);
+  const matSteelGrey = makeToonMat(0x64748b);
+  const matRailingWhite = makeToonMat(0xe2e8f0);
+  const matTarpGreen = makeToonMat(0x3f4f44);
+  const matLifeRingOrange = makeToonMat(0xea580c);
+  const matFireRed = makeToonMat(0xdc2626);
+  const matFlagRed = makeToonMat(0xef4444, { side: THREE.DoubleSide });
+  const matHazard = makeToonMat(0xffffff, { map: createHazardTexture(18) });
+  const matYellowSafety = makeToonMat(0xeab308);
+  const matGreenSafe = makeToonMat(0x10b981);
+  const matWoodFloor = makeToonMat(0x8c583a);
+  const matWoodFurniture = makeToonMat(0x704225);
+  const matLightWood = makeToonMat(0xb47b4e);
+  const matSheetBlue = makeToonMat(0x4b7bec);
+  const matSheetWarm = makeToonMat(0xe67e22);
+  const matPillowWhite = makeToonMat(0xf8fafc);
+  const matSkin = makeToonMat(0xffdcb8);
+  const matCurtain = makeToonMat(0xc47d52);
+
+  // ----------------------------------------------------------------------------
+  // 6.1 趸船钢制底壳（Hull）与防撞护舷
+  // ----------------------------------------------------------------------------
+  const hullGroup = new THREE.Group();
+  boatGroup.add(hullGroup);
+
+  const mainHull = createToonBox(28.0, 1.3, 10.0, matHullDark, 20);
+  mainHull.position.set(0, 0.0, -0.5);
+  hullGroup.add(mainHull);
+
+  const waterlineBelt = createToonBox(28.15, 0.38, 10.15, matHullBlack, 20);
+  waterlineBelt.position.set(0, -0.35, -0.5);
+  hullGroup.add(waterlineBelt);
+
+  const mainDeck = createToonBox(28.3, 0.18, 10.3, matDeckWet, 20);
+  mainDeck.position.set(0, 0.68, -0.5);
+  hullGroup.add(mainDeck);
+
+  for (let x = -13.2; x <= 13.2; x += 1.65) {
+    const ribF = createToonBox(0.22, 1.15, 0.25, matHullBlack, 20);
+    ribF.position.set(x, 0.05, 4.58);
+    hullGroup.add(ribF);
+
+    const ribB = createToonBox(0.22, 1.15, 0.25, matHullBlack, 20);
+    ribB.position.set(x, 0.05, -5.58);
+    hullGroup.add(ribB);
+  }
+
+  for (let x = -12.0; x <= 12.0; x += 4.0) {
+    if (Math.abs(x) < 2.5) continue;
+    const fenderTire = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.12, 10, 18), matHullBlack);
+    fenderTire.position.set(x, 0.22, 4.68);
+    hullGroup.add(fenderTire);
+  }
+
+  const hullHazardFront = createToonBox(28.32, 0.2, 0.15, matHazard, 20);
+  hullHazardFront.position.set(0, 0.65, 4.62);
+  hullGroup.add(hullHazardFront);
+
+  // ----------------------------------------------------------------------------
+  // 6.2 一层舱室与生活生产安全设施
+  // ----------------------------------------------------------------------------
+  const floor1Group = new THREE.Group();
+  floor1Group.position.set(0, 0.77, -0.5);
+  boatGroup.add(floor1Group);
+
+  const f1CabinW = 18.8;
+  const f1CabinH = 2.5;
+  const f1CabinD = 6.6;
+
+  const f1Body = createToonBox(f1CabinW, f1CabinH, f1CabinD, matCabinWhite, 20);
+  f1Body.position.set(0, f1CabinH / 2, 0);
+  floor1Group.add(f1Body);
+
+  const f1Skirt = createToonBox(f1CabinW + 0.08, 0.28, f1CabinD + 0.08, matNavBlue, 20);
+  f1Skirt.position.set(0, 0.14, 0);
+  floor1Group.add(f1Skirt);
+
+  const f1TopBelt = createToonBox(f1CabinW + 0.1, 0.22, f1CabinD + 0.1, matNavBlue, 20);
+  f1TopBelt.position.set(0, f1CabinH - 0.11, 0);
+  floor1Group.add(f1TopBelt);
+
+  // 一层中央玻璃双开门
+  const f1DoorFrame = createToonBox(1.9, 2.05, 0.14, matFrameSilver, 20);
+  f1DoorFrame.position.set(0, 1.05, f1CabinD / 2 + 0.03);
+  floor1Group.add(f1DoorFrame);
+
+  const matWarmGlass1F = makeToonMat(0xffcc77, {
+    emissive: 0xff9d3b,
+    emissiveIntensity: 0.65
+  });
+  const f1DoorGlass = new THREE.Mesh(new THREE.PlaneGeometry(1.65, 1.85), matWarmGlass1F);
+  f1DoorGlass.position.set(0, 1.05, f1CabinD / 2 + 0.11);
+  floor1Group.add(f1DoorGlass);
+
+  // 一层正面两侧推拉窗
+  const f1WinPositions = [-7.5, -5.1, -2.7, 2.7, 5.1, 7.5];
+  f1WinPositions.forEach((wx, idx) => {
+    const wFrame = createToonBox(1.55, 1.15, 0.12, matFrameSilver, 20);
+    wFrame.position.set(wx, 1.38, f1CabinD / 2 + 0.03);
+    floor1Group.add(wFrame);
+
+    const intensity = idx % 2 === 0 ? 0.55 : 0.32;
+    const wGlassMat = makeToonMat(0xffbb66, {
+      emissive: 0xff8822,
+      emissiveIntensity: intensity
+    });
+    const wGlass = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.0), wGlassMat);
+    wGlass.position.set(wx, 1.38, f1CabinD / 2 + 0.1);
+    floor1Group.add(wGlass);
+
+    const mullion = createToonBox(0.06, 1.05, 0.14, matFrameSilver, 20);
+    mullion.position.set(wx, 1.38, f1CabinD / 2 + 0.05);
+    floor1Group.add(mullion);
+  });
+
+  // 一层正门左侧“救生衣存放箱”与长柄救生钩杆
+  const lifeJacketBox = createToonBox(0.75, 1.15, 0.36, matLifeRingOrange, 20);
+  lifeJacketBox.position.set(-2.05, 0.6, f1CabinD / 2 + 0.18);
+  const ljSign = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.62, 0.32),
+    new THREE.MeshBasicMaterial({
+      map: createSignTexture('救生衣箱', '#ffffff', '#ea580c', '#ea580c', 160, 80)
+    })
+  );
+  ljSign.position.set(0, 0.25, 0.19);
+  lifeJacketBox.add(ljSign);
+  floor1Group.add(lifeJacketBox);
+
+  const rescuePole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.4, 8), matRailingWhite);
+  rescuePole.rotation.z = Math.PI / 2;
+  rescuePole.position.set(-6.3, 2.15, f1CabinD / 2 + 0.08);
+  floor1Group.add(rescuePole);
+
+  // 一层舱壁右侧《航道安全生产公示栏》
+  const boardSign = createToonBox(1.45, 0.85, 0.06, makeToonMat(0xffffff, {
+    map: createSignTexture('安全生产公示栏', '#eff6ff', '#1e40af', '#2563eb', 256, 128)
+  }), 20);
+  boardSign.position.set(6.3, 1.42, f1CabinD / 2 + 0.06);
+  floor1Group.add(boardSign);
+
+  // 【修改点8】：将拖把挂架与洗拖把的蓝水桶放在一楼前舱壁左侧（窗户左边区域）
+  const cleaningGroup = new THREE.Group();
+  cleaningGroup.position.set(-8.85, 0.02, f1CabinD / 2 + 0.08);
+  cleaningGroup.rotation.y = Math.PI / 2;
+  floor1Group.add(cleaningGroup);
+
+  const mopRack = createToonBox(0.08, 0.12, 0.92, matSteelGrey, 20);
+  mopRack.position.set(0, 1.25, 0);
+  cleaningGroup.add(mopRack);
+
+  [-0.3, 0.0, 0.3].forEach((mz) => {
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.15, 8), matLightWood);
+    handle.position.set(0.06, 0.78, mz);
+    const mopHead = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 10), makeToonMat(0xcbd5e1));
+    mopHead.position.set(0.06, 0.22, mz);
+    addHullOutline(mopHead, 1.06);
+    cleaningGroup.add(handle, mopHead);
+  });
+
+  const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.38, 14), makeToonMat(0x2563eb));
+  bucket.position.set(0.36, 0.19, 0.42);
+  addOutline(bucket, 20);
+  cleaningGroup.add(bucket);
+
+  // ----------------------------------------------------------------------------
+  // 6.3 二层甲板与四个真实立体 3D 船员宿舍
+  // ----------------------------------------------------------------------------
+  const floor2Y = 0.77 + f1CabinH; // 3.27
+  const floor2Group = new THREE.Group();
+  floor2Group.position.set(0, floor2Y, -0.5);
+  boatGroup.add(floor2Group);
+
+  const f2DeckW = 21.8;
+  const f2DeckD = 8.2;
+  const f2DeckSlab = createToonBox(f2DeckW, 0.24, f2DeckD, matCabinWhite, 20);
+  f2DeckSlab.position.set(0, 0, 0);
+  floor2Group.add(f2DeckSlab);
+
+  const f2BlueTrim = createToonBox(f2DeckW + 0.06, 0.14, f2DeckD + 0.06, matNavBlue, 20);
+  f2BlueTrim.position.set(0, -0.06, 0);
+  floor2Group.add(f2BlueTrim);
+
+  const f2Walkway = createToonBox(f2DeckW - 0.2, 0.06, f2DeckD - 0.2, matDeckGrey, 20);
+  f2Walkway.position.set(0, 0.13, 0);
+  floor2Group.add(f2Walkway);
+
+  const f2CabinW = 17.6;
+  const f2CabinH = 2.7;
+  const f2CabinD = 5.6;
+  const frontWallZ = f2CabinD / 2; // +2.8
+
+  const backWall = createToonBox(f2CabinW, f2CabinH, 0.2, matCabinWhite, 20);
+  backWall.position.set(0, f2CabinH / 2, -f2CabinD / 2 + 0.1);
+  floor2Group.add(backWall);
+
+  const leftOuterWall = createToonBox(0.25, f2CabinH, f2CabinD, matCabinWhite, 20);
+  leftOuterWall.position.set(-f2CabinW / 2 + 0.125, f2CabinH / 2, 0);
+  floor2Group.add(leftOuterWall);
+
+  const rightOuterWall = createToonBox(0.25, f2CabinH, f2CabinD, matCabinWhite, 20);
+  rightOuterWall.position.set(f2CabinW / 2 - 0.125, f2CabinH / 2, 0);
+  floor2Group.add(rightOuterWall);
+
+  const frontBottomWall = createToonBox(f2CabinW, 0.58, 0.22, matCabinWhite, 20);
+  frontBottomWall.position.set(0, 0.29, frontWallZ - 0.11);
+  floor2Group.add(frontBottomWall);
+
+  const frontTopWall = createToonBox(f2CabinW, 0.42, 0.22, matCabinWhite, 20);
+  frontTopWall.position.set(0, f2CabinH - 0.21, frontWallZ - 0.11);
+  floor2Group.add(frontTopWall);
+
+  const pillarPositions = [-8.4, -4.2, 0.0, 4.2, 8.4];
+  const matInteriorWall = makeToonMat(0xf5e8d3);
+  pillarPositions.forEach((px) => {
+    const pillar = createToonBox(0.85, 1.72, 0.24, matCabinWhite, 20);
+    pillar.position.set(px, 0.58 + 0.86, frontWallZ - 0.11);
+    floor2Group.add(pillar);
+
+    const divider = createToonBox(0.16, f2CabinH - 0.1, f2CabinD - 0.2, matInteriorWall, 20, true);
+    divider.position.set(px, f2CabinH / 2, 0);
+    floor2Group.add(divider);
+  });
+
+  // ----------------------------------------------------------------------------
+  // 7. 二楼四间船员宿舍 3D 室内场景与人物晚间活动
+  // ----------------------------------------------------------------------------
+  const characterAnims = {};
+  const teaSteamParticles = [];
+  const windowRainBeads = [];
+
+  function createCrewCharacter(shirtColor, pantsColor, hairColor, isSitting = true) {
+    const charGroup = new THREE.Group();
+
+    const matShirt = makeToonMat(shirtColor);
+    const matPants = makeToonMat(pantsColor);
+    const matHair = makeToonMat(hairColor);
+
+    const torso = createToonBox(0.42, 0.52, 0.26, matShirt, 20, true);
+    torso.position.set(0, 0.26, 0);
+    addHullOutline(torso, 1.05);
+    charGroup.add(torso);
+
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 0.66, 0);
+    charGroup.add(headGroup);
+
+    const headGeo = new THREE.SphereGeometry(0.19, 16, 14);
+    const head = new THREE.Mesh(headGeo, matSkin);
+    addHullOutline(head, 1.07);
+    headGroup.add(head);
+
+    const hairCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.205, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+      matHair
+    );
+    hairCap.position.y = 0.02;
+    hairCap.rotation.x = -0.15;
+    headGroup.add(hairCap);
+
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1e1b18 });
+    const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.045, 0.02), eyeMat);
+    leftEye.position.set(-0.065, 0.0, 0.175);
+    const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.045, 0.02), eyeMat);
+    rightEye.position.set(0.065, 0.0, 0.175);
+    headGroup.add(leftEye, rightEye);
+
+    const leftArmPivot = new THREE.Group();
+    leftArmPivot.position.set(-0.26, 0.46, 0);
+    const leftArm = createToonBox(0.12, 0.42, 0.12, matShirt, 20, true);
+    leftArm.position.set(0, -0.18, 0);
+    const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), matSkin);
+    leftHand.position.set(0, -0.4, 0);
+    leftArmPivot.add(leftArm, leftHand);
+    charGroup.add(leftArmPivot);
+
+    const rightArmPivot = new THREE.Group();
+    rightArmPivot.position.set(0.26, 0.46, 0);
+    const rightArm = createToonBox(0.12, 0.42, 0.12, matShirt, 20, true);
+    rightArm.position.set(0, -0.18, 0);
+    const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), matSkin);
+    rightHand.position.set(0, -0.4, 0);
+    rightArmPivot.add(rightArm, rightHand);
+    charGroup.add(rightArmPivot);
+
+    if (isSitting) {
+      const thighL = createToonBox(0.15, 0.15, 0.38, matPants, 20, true);
+      thighL.position.set(-0.11, 0.05, 0.16);
+      const calfL = createToonBox(0.13, 0.36, 0.13, matPants, 20, true);
+      calfL.position.set(-0.11, -0.16, 0.32);
+
+      const thighR = createToonBox(0.15, 0.15, 0.38, matPants, 20, true);
+      thighR.position.set(0.11, 0.05, 0.16);
+      const calfR = createToonBox(0.13, 0.36, 0.13, matPants, 20, true);
+      calfR.position.set(0.11, -0.16, 0.32);
+      charGroup.add(thighL, calfL, thighR, calfR);
+    } else {
+      const legL = createToonBox(0.15, 0.52, 0.15, matPants, 20, true);
+      legL.position.set(-0.11, -0.25, 0);
+      const legR = createToonBox(0.15, 0.52, 0.15, matPants, 20, true);
+      legR.position.set(0.11, -0.25, 0);
+      charGroup.add(legL, legR);
+    }
+
+    return {
+      root: charGroup,
+      torso,
+      headGroup,
+      leftArmPivot,
+      rightArmPivot,
+      leftHand,
+      rightHand
+    };
+  }
+
+  const roomCentersX = [-6.3, -2.1, 2.1, 6.3];
+
+  roomCentersX.forEach((rx, roomIdx) => {
+    const roomGroup = new THREE.Group();
+    roomGroup.position.set(rx, 0.15, 0.25);
+    floor2Group.add(roomGroup);
+
+    const rFloor = createToonBox(3.95, 0.08, 4.8, matWoodFloor, 20, true, false);
+    rFloor.position.set(0, 0.02, 0);
+    roomGroup.add(rFloor);
+
+    const matWarmBackWall = makeToonMat(0xffe4bc, {
+      emissive: 0xff9f43,
+      emissiveIntensity: 0.28
+    });
+    const rBackWall = createToonBox(3.95, 2.42, 0.12, matWarmBackWall, 20, true, false);
+    rBackWall.position.set(0, 1.22, -1.85);
+    roomGroup.add(rBackWall);
+
+    const ceilingLamp = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.32, 0.38, 0.1, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffea9f })
+    );
+    ceilingLamp.position.set(0, 2.38, 0.1);
+    roomGroup.add(ceilingLamp);
+
+    const roomLight = new THREE.PointLight(0xff9f38, 1.45, 7.5, 1.6);
+    roomLight.position.set(0, 1.95, 0.4);
+    roomGroup.add(roomLight);
+
+    const curtainL = createToonBox(0.36, 1.65, 0.12, matCurtain, 20, true);
+    curtainL.position.set(-1.52, 1.28, 2.32);
+    const curtainR = createToonBox(0.36, 1.65, 0.12, matCurtain, 20, true);
+    curtainR.position.set(1.52, 1.28, 2.32);
+    roomGroup.add(curtainL, curtainR);
+
+    const acUnit = createToonBox(0.95, 0.26, 0.22, matPillowWhite, 20, true);
+    acUnit.position.set(-1.1, 2.08, -1.72);
+    roomGroup.add(acUnit);
+
+    const winOuterFrame = new THREE.Group();
+    winOuterFrame.position.set(0, 1.29, 2.45);
+    roomGroup.add(winOuterFrame);
+
+    const wfTop = createToonBox(3.38, 0.08, 0.14, matFrameSilver, 20);
+    wfTop.position.y = 0.84;
+    const wfBot = createToonBox(3.38, 0.08, 0.14, matFrameSilver, 20);
+    wfBot.position.y = -0.84;
+    const wfLeft = createToonBox(0.08, 1.72, 0.14, matFrameSilver, 20);
+    wfLeft.position.x = -1.65;
+    const wfRight = createToonBox(0.08, 1.72, 0.14, matFrameSilver, 20);
+    wfRight.position.x = 1.65;
+    const wfMullion = createToonBox(0.05, 1.68, 0.1, matFrameSilver, 20);
+    wfMullion.position.x = -0.85;
+    winOuterFrame.add(wfTop, wfBot, wfLeft, wfRight, wfMullion);
+
+    const glassMat = new THREE.MeshBasicMaterial({
+      color: 0xffd599,
+      transparent: true,
+      opacity: 0.13,
+      depthWrite: false
+    });
+    const glassPane = new THREE.Mesh(new THREE.PlaneGeometry(3.26, 1.62), glassMat);
+    winOuterFrame.add(glassPane);
+
+    const beadMat = new THREE.MeshBasicMaterial({
+      color: 0xffe4aa,
+      transparent: true,
+      opacity: 0.78
+    });
+    for (let b = 0; b < 14; b++) {
+      const beadGroup = new THREE.Group();
+      const dropHead = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 6), beadMat);
+      const dropTail = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.14, 6), beadMat);
+      dropTail.position.y = 0.07;
+      beadGroup.add(dropHead, dropTail);
+
+      const bx = (Math.random() - 0.5) * 3.0;
+      const by = (Math.random() - 0.5) * 1.45;
+      beadGroup.position.set(bx, by, 0.03);
+      winOuterFrame.add(beadGroup);
+
+      windowRainBeads.push({
+        mesh: beadGroup,
+        baseX: bx,
+        y: by,
+        speed: 0.18 + Math.random() * 0.25,
+        wigglePhase: Math.random() * Math.PI * 2
+      });
+    }
+
+    if (roomIdx === 0) {
+      const bedFrame = createToonBox(1.15, 0.38, 2.0, matLightWood, 20, true);
+      bedFrame.position.set(1.22, 0.22, -0.65);
+      const mattress = createToonBox(1.08, 0.14, 1.92, matPillowWhite, 20, true);
+      mattress.position.set(1.22, 0.45, -0.65);
+      const blanket = createToonBox(1.09, 0.16, 1.15, matSheetBlue, 20, true);
+      blanket.position.set(1.22, 0.47, -0.32);
+      const pillow = createToonBox(0.65, 0.12, 0.36, matPillowWhite, 20, true);
+      pillow.position.set(1.22, 0.55, -1.35);
+      roomGroup.add(bedFrame, mattress, blanket, pillow);
+
+      const poster1 = createToonBox(0.75, 0.95, 0.04, makeToonMat(0xec4899, { emissive: 0xbe185d, emissiveIntensity: 0.3 }), 20, true);
+      poster1.position.set(0.1, 1.48, -1.76);
+      const poster2 = createToonBox(0.65, 0.55, 0.04, makeToonMat(0x38bdf8, { emissive: 0x0284c7, emissiveIntensity: 0.3 }), 20, true);
+      poster2.position.set(1.1, 1.55, -1.76);
+      roomGroup.add(poster1, poster2);
+
+      const deskGroup = new THREE.Group();
+      deskGroup.position.set(-0.65, 0.06, 0.55);
+      deskGroup.rotation.y = 0.55;
+      roomGroup.add(deskGroup);
+
+      const deskTop = createToonBox(1.45, 0.08, 0.75, matWoodFurniture, 20, true);
+      deskTop.position.set(0, 0.74, 0);
+      const deskLegL = createToonBox(0.1, 0.72, 0.68, matHullDark, 20, true);
+      deskLegL.position.set(-0.62, 0.36, 0);
+      const deskLegR = createToonBox(0.1, 0.72, 0.68, matHullDark, 20, true);
+      deskLegR.position.set(0.62, 0.36, 0);
+      deskGroup.add(deskTop, deskLegL, deskLegR);
+
+      const monMat1 = new THREE.MeshBasicMaterial({ color: 0x38f2ff });
+      const monMat2 = new THREE.MeshBasicMaterial({ color: 0xffb142 });
+      const mon1 = createToonBox(0.58, 0.38, 0.05, monMat1, 20, true);
+      mon1.position.set(-0.26, 1.04, -0.18);
+      mon1.rotation.y = 0.18;
+      const mon2 = createToonBox(0.58, 0.38, 0.05, monMat2, 20, true);
+      mon2.position.set(0.32, 1.04, -0.18);
+      mon2.rotation.y = -0.18;
+      deskGroup.add(mon1, mon2);
+
+      const pcCase = createToonBox(0.24, 0.45, 0.45, matHullDark, 20, true);
+      pcCase.position.set(0.52, 0.99, 0.05);
+      const rgbStrip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.38, 0.04), new THREE.MeshBasicMaterial({ color: 0x22d3ee }));
+      rgbStrip.position.set(0.41, 0.99, 0.26);
+      const keyboard = createToonBox(0.44, 0.03, 0.16, new THREE.MeshBasicMaterial({ color: 0xf43f5e }), 20, true);
+      keyboard.position.set(0, 0.79, 0.15);
+      deskGroup.add(pcCase, rgbStrip, keyboard);
+
+      const screenLight = new THREE.PointLight(0x38bdf8, 0.9, 2.2);
+      screenLight.position.set(0, 1.05, 0.15);
+      deskGroup.add(screenLight);
+
+      const chair = createToonBox(0.52, 0.85, 0.12, makeToonMat(0xdc2626), 20, true);
+      chair.position.set(0, 0.55, 0.68);
+      deskGroup.add(chair);
+
+      const gamer = createCrewCharacter(0x2563eb, 0x1e293b, 0x171717, true);
+      gamer.root.position.set(0, 0.44, 0.52);
+      gamer.root.rotation.y = Math.PI;
+      gamer.leftArmPivot.rotation.x = -1.05;
+      gamer.rightArmPivot.rotation.x = -1.05;
+
+      const headphoneMat = makeToonMat(0xf97316);
+      const hpBand = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.025, 8, 16, Math.PI), headphoneMat);
+      hpBand.position.set(0, 0.02, 0);
+      const hpEarL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 12), headphoneMat);
+      hpEarL.rotation.z = Math.PI / 2;
+      hpEarL.position.set(-0.2, -0.02, 0);
+      const hpEarR = hpEarL.clone();
+      hpEarR.position.set(0.2, -0.02, 0);
+      gamer.headGroup.add(hpBand, hpEarL, hpEarR);
+
+      deskGroup.add(gamer.root);
+      characterAnims.gamer = { char: gamer, mon1, mon2, screenLight };
+
+    } else if (roomIdx === 1) {
+      const mapSign = createToonBox(1.5, 0.88, 0.04, makeToonMat(0xffffff, {
+        map: createSignTexture('長 江 航 道 圖', '#e0f2fe', '#1e3a8a', '#0284c7', 256, 128)
+      }), 20, true);
+      mapSign.position.set(-0.25, 1.48, -1.76);
+
+      const calendar = createToonBox(0.52, 0.72, 0.04, makeToonMat(0xffffff, {
+        map: createSignTexture('十月 平安', '#fef2f2', '#dc2626', '#ef4444', 128, 180)
+      }), 20, true);
+      calendar.position.set(1.15, 1.48, -1.76);
+      roomGroup.add(mapSign, calendar);
+
+      const teaTable = createToonBox(1.35, 0.09, 0.85, matWoodFurniture, 20, true);
+      teaTable.position.set(0.0, 0.62, 0.65);
+      const tLeg1 = createToonBox(0.12, 0.6, 0.72, matWoodFurniture, 20, true);
+      tLeg1.position.set(-0.55, 0.3, 0.65);
+      const tLeg2 = createToonBox(0.12, 0.6, 0.72, matWoodFurniture, 20, true);
+      tLeg2.position.set(0.55, 0.3, 0.65);
+      roomGroup.add(teaTable, tLeg1, tLeg2);
+
+      const teaTray = createToonBox(0.65, 0.04, 0.42, matHullDark, 20, true);
+      teaTray.position.set(0.12, 0.68, 0.65);
+      const teapot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), makeToonMat(0x7c2d12));
+      teapot.position.set(0.22, 0.77, 0.65);
+      addHullOutline(teapot, 1.08);
+      roomGroup.add(teaTray, teapot);
+
+      const steamMat = new THREE.MeshBasicMaterial({
+        color: 0xfff7ed,
+        transparent: true,
+        opacity: 0.45
+      });
+      for (let s = 0; s < 6; s++) {
+        const steamPuff = new THREE.Mesh(new THREE.SphereGeometry(0.035 + s * 0.006, 8, 8), steamMat.clone());
+        steamPuff.position.set(0.18, 0.85 + s * 0.08, 0.65);
+        roomGroup.add(steamPuff);
+        teaSteamParticles.push({
+          mesh: steamPuff,
+          baseY: 0.85,
+          offset: s * 0.17
+        });
+      }
+
+      const masterChair = createToonBox(0.58, 0.78, 0.55, matWoodFurniture, 20, true);
+      masterChair.position.set(-0.45, 0.4, 0.15);
+      masterChair.rotation.y = 0.45;
+      roomGroup.add(masterChair);
+
+      const master = createCrewCharacter(0xd97706, 0x334155, 0xcbd5e1, true);
+      master.root.position.set(-0.42, 0.44, 0.18);
+      master.root.rotation.y = 0.45;
+      master.leftArmPivot.rotation.x = -0.65;
+
+      const teaCup = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.09, 10), matPillowWhite);
+      teaCup.position.set(0, -0.42, 0.05);
+      master.rightArmPivot.add(teaCup);
+      roomGroup.add(master.root);
+
+      const sideCab = createToonBox(0.85, 1.45, 0.55, matLightWood, 20, true);
+      sideCab.position.set(1.35, 0.75, -1.1);
+      roomGroup.add(sideCab);
+
+      characterAnims.master = { char: master };
+
+    } else if (roomIdx === 2) {
+      const bunkGroup = new THREE.Group();
+      bunkGroup.position.set(-1.15, 0.04, -0.45);
+      roomGroup.add(bunkGroup);
+
+      const postPositions = [[-0.52, -0.92], [0.52, -0.92], [-0.52, 0.92], [0.52, 0.92]];
+      postPositions.forEach(([px, pz]) => {
+        const post = createToonBox(0.07, 1.88, 0.07, matSteelGrey, 20, true);
+        post.position.set(px, 0.94, pz);
+        bunkGroup.add(post);
+      });
+
+      [0.38, 1.32].forEach((by) => {
+        const board = createToonBox(1.08, 0.1, 1.88, matPillowWhite, 20, true);
+        board.position.set(0, by, 0);
+        const quilt = createToonBox(1.04, 0.14, 1.1, matSheetWarm, 20, true);
+        quilt.position.set(0, by + 0.1, 0.3);
+        const pil = createToonBox(0.6, 0.1, 0.34, matPillowWhite, 20, true);
+        pil.position.set(0, by + 0.1, -0.65);
+        bunkGroup.add(board, quilt, pil);
+      });
+
+      const rackPole = createToonBox(0.06, 1.65, 0.06, matWoodFurniture, 20, true);
+      rackPole.position.set(1.25, 0.85, -0.85);
+      const hangingJacket = createToonBox(0.45, 0.58, 0.22, matNavBlue, 20, true);
+      hangingJacket.position.set(1.25, 1.25, -0.85);
+      const vestStripe = createToonBox(0.47, 0.1, 0.24, matLifeRingOrange, 20, true);
+      vestStripe.position.set(1.25, 1.22, -0.85);
+      roomGroup.add(rackPole, hangingJacket, vestStripe);
+
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.13, 0.28, 12), makeToonMat(0xb45309));
+      pot.position.set(1.15, 0.18, 1.25);
+      const plantBush = new THREE.Mesh(new THREE.DodecahedronGeometry(0.26, 1), makeToonMat(0x16a34a));
+      plantBush.position.set(1.15, 0.45, 1.25);
+      addHullOutline(plantBush, 1.07);
+      roomGroup.add(pot, plantBush);
+
+      const caller = createCrewCharacter(0x10b981, 0x1e293b, 0x27272a, false);
+      caller.root.position.set(0.28, 0.56, 1.05);
+      caller.root.rotation.y = -0.25;
+
+      caller.rightArmPivot.rotation.x = -2.25;
+      caller.rightArmPivot.rotation.z = -0.32;
+      const phoneMesh = createToonBox(0.08, 0.15, 0.02, new THREE.MeshBasicMaterial({ color: 0x93c5fd }), 20, true);
+      phoneMesh.position.set(-0.04, -0.42, 0.04);
+      caller.rightArmPivot.add(phoneMesh);
+
+      roomGroup.add(caller.root);
+      characterAnims.caller = { char: caller };
+
+    } else if (roomIdx === 3) {
+      const shelfFrame = createToonBox(1.65, 1.85, 0.38, matWoodFurniture, 20, true);
+      shelfFrame.position.set(-0.65, 0.96, -1.52);
+      roomGroup.add(shelfFrame);
+
+      const bookPalette = [0xef4444, 0x3b82f6, 0xf59e0b, 0x10b981, 0x8b5cf6, 0xec4899];
+      for (let row = 0; row < 3; row++) {
+        for (let b = 0; b < 7; b++) {
+          const bCol = bookPalette[(row * 7 + b) % bookPalette.length];
+          const book = createToonBox(0.14, 0.34, 0.26, makeToonMat(bCol), 20, true);
+          book.position.set(-1.22 + b * 0.19, 0.55 + row * 0.52, -1.42);
+          roomGroup.add(book);
+        }
+      }
+
+      const rug = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.02, 24), makeToonMat(0xd97706));
+      rug.position.set(0.25, 0.06, 0.65);
+      roomGroup.add(rug);
+
+      const rDesk = createToonBox(1.3, 0.08, 0.72, matLightWood, 20, true);
+      rDesk.position.set(0.35, 0.72, 0.72);
+      const rLegL = createToonBox(0.1, 0.7, 0.65, matWoodFurniture, 20, true);
+      rLegL.position.set(-0.22, 0.35, 0.72);
+      const rLegR = createToonBox(0.1, 0.7, 0.65, matWoodFurniture, 20, true);
+      rLegR.position.set(0.92, 0.35, 0.72);
+      roomGroup.add(rDesk, rLegL, rLegR);
+
+      const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.05, 12), matHullDark);
+      lampBase.position.set(0.75, 0.78, 0.65);
+      const lampStem = createToonBox(0.04, 0.35, 0.04, matHullDark, 20, true);
+      lampStem.position.set(0.75, 0.95, 0.65);
+      const lampShade = new THREE.Mesh(
+        new THREE.ConeGeometry(0.18, 0.2, 14),
+        new THREE.MeshBasicMaterial({ color: 0xffb74d })
+      );
+      lampShade.position.set(0.68, 1.12, 0.65);
+      lampShade.rotation.z = 0.35;
+      roomGroup.add(lampBase, lampStem, lampShade);
+
+      const deskLampLight = new THREE.PointLight(0xff9800, 1.1, 2.8);
+      deskLampLight.position.set(0.55, 1.02, 0.65);
+      roomGroup.add(deskLampLight);
+
+      const reader = createCrewCharacter(0xe11d48, 0x334155, 0x1e1b18, true);
+      reader.root.position.set(-0.08, 0.44, 0.32);
+      reader.root.rotation.y = 0.42;
+      reader.headGroup.rotation.x = 0.28;
+      reader.leftArmPivot.rotation.x = -1.1;
+      reader.rightArmPivot.rotation.x = -1.1;
+
+      const openBook = createToonBox(0.36, 0.05, 0.26, matPillowWhite, 20, true);
+      openBook.position.set(0.22, 0.78, 0.68);
+      openBook.rotation.y = 0.42;
+      roomGroup.add(openBook, reader.root);
+
+      characterAnims.reader = { char: reader, book: openBook };
+    }
+  });
+
+  // ----------------------------------------------------------------------------
+  // 8. 三层航道值班室（已移除三楼隐患，值班员常态化规范值守）
+  // ----------------------------------------------------------------------------
+  const floor3Y = floor2Y + f2CabinH; // 5.97
+  const floor3Group = new THREE.Group();
+  floor3Group.position.set(0, floor3Y, -0.5);
+  boatGroup.add(floor3Group);
+
+  const f3DeckW = 21.8;
+  const f3DeckD = 8.0;
+  const f3DeckSlab = createToonBox(f3DeckW, 0.22, f3DeckD, matCabinWhite, 20);
+  f3DeckSlab.position.set(0, 0, 0);
+  floor3Group.add(f3DeckSlab);
+
+  const f3BlueTrim = createToonBox(f3DeckW + 0.08, 0.14, f3DeckD + 0.08, matNavBlue, 20);
+  f3BlueTrim.position.set(0, -0.05, 0);
+  floor3Group.add(f3BlueTrim);
+
+  const f3CabinW = 10.6;
+  const f3CabinH = 2.35;
+  const f3CabinD = 5.0;
+  const f3FrontZ = 2.3;
+
+  const f3BackWall = createToonBox(f3CabinW, f3CabinH, 0.2, matCabinWhite, 20);
+  f3BackWall.position.set(0, f3CabinH / 2, -2.6);
+  const f3LeftWall = createToonBox(0.22, f3CabinH, f3CabinD, matCabinWhite, 20);
+  f3LeftWall.position.set(-f3CabinW / 2 + 0.11, f3CabinH / 2, -0.2);
+  const f3RightWall = createToonBox(0.22, f3CabinH, f3CabinD, matCabinWhite, 20);
+  f3RightWall.position.set(f3CabinW / 2 - 0.11, f3CabinH / 2, -0.2);
+  const f3BotWall = createToonBox(f3CabinW, 0.68, 0.2, matCabinWhite, 20);
+  f3BotWall.position.set(0, 0.34, f3FrontZ - 0.1);
+  const f3TopWall = createToonBox(f3CabinW, 0.42, 0.2, matCabinWhite, 20);
+  f3TopWall.position.set(0, f3CabinH - 0.21, f3FrontZ - 0.1);
+  floor3Group.add(f3BackWall, f3LeftWall, f3RightWall, f3BotWall, f3TopWall);
+
+  [-5.0, -2.4, 0.0, 2.4, 5.0].forEach((px) => {
+    const p = createToonBox(0.55, 1.28, 0.22, matCabinWhite, 20);
+    p.position.set(px, 0.68 + 0.64, f3FrontZ - 0.1);
+    floor3Group.add(p);
+  });
+
+  const f3WinX = [-3.7, -1.2, 1.2, 3.7];
+  f3WinX.forEach((wx) => {
+    const wf = createToonBox(1.85, 0.07, 0.14, matFrameSilver, 20);
+    wf.position.set(wx, 1.92, f3FrontZ - 0.05);
+    const wfB = createToonBox(1.85, 0.07, 0.14, matFrameSilver, 20);
+    wfB.position.set(wx, 0.7, f3FrontZ - 0.05);
+    const wg = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.8, 1.2),
+      new THREE.MeshBasicMaterial({ color: 0xffd599, transparent: true, opacity: 0.14, depthWrite: false })
+    );
+    wg.position.set(wx, 1.31, f3FrontZ - 0.02);
+    floor3Group.add(wf, wfB, wg);
+  });
+
+  const f3InteriorFloor = createToonBox(10.1, 0.08, 4.6, makeToonMat(0x334155), 20, true, false);
+  f3InteriorFloor.position.set(0, 0.14, -0.2);
+  const f3InnerBack = createToonBox(10.1, 2.2, 0.1, makeToonMat(0xfef3c7, { emissive: 0xff9f43, emissiveIntensity: 0.25 }), 20, true, false);
+  f3InnerBack.position.set(0, 1.2, -2.42);
+  floor3Group.add(f3InteriorFloor, f3InnerBack);
+
+  const dutyRuleSign = createToonBox(2.2, 0.9, 0.05, makeToonMat(0xffffff, {
+    map: createSignTexture('24小时航道值班室', '#dbeafe', '#1e3a8a', '#2563eb', 256, 110)
+  }), 20, true);
+  dutyRuleSign.position.set(0, 1.55, -2.32);
+  floor3Group.add(dutyRuleSign);
+
+  const f3RoomLight = new THREE.PointLight(0xffb74d, 1.5, 9.0, 1.5);
+  f3RoomLight.position.set(0, 2.0, 0.2);
+  floor3Group.add(f3RoomLight);
+
+  const consoleDesk = createToonBox(4.2, 0.72, 0.95, matHullDark, 20, true);
+  consoleDesk.position.set(0, 0.48, 0.35);
+  floor3Group.add(consoleDesk);
+
+  // 【修改点4】：已移除3楼桌上两个牌子（AIS与VHF立牌已彻底去除），保持桌面清爽干净
+  const dutyOfficer = createCrewCharacter(0x1e3a8a, 0x0f172a, 0x171717, true);
+  dutyOfficer.root.position.set(0, 0.52, -0.32);
+  dutyOfficer.leftArmPivot.rotation.x = -0.95;
+  dutyOfficer.rightArmPivot.rotation.x = -0.95;
+
+  const dutyChair = createToonBox(0.58, 0.92, 0.14, makeToonMat(0x1e293b), 20, true);
+  dutyChair.position.set(0, 0.6, -0.52);
+  floor3Group.add(dutyChair);
+  characterAnims.dutyOfficer = { char: dutyOfficer };
+
+  const f3MainRoof = createToonBox(f3CabinW + 1.4, 0.16, f3CabinD + 1.4, matRoofBlue, 20);
+  f3MainRoof.position.set(0, f3CabinH + 0.06, -0.2);
+  floor3Group.add(f3MainRoof);
+
+  [-7.5, 7.5].forEach((sideX) => {
+    const canopyW = 4.6;
+    const canopyD = 5.4;
+    const canopyRoof = createToonBox(canopyW, 0.14, canopyD, matRoofBlue, 20);
+    canopyRoof.position.set(sideX, f3CabinH - 0.05, -0.2);
+    floor3Group.add(canopyRoof);
+
+    const colOffsets = [
+      [-canopyW / 2 + 0.25, -canopyD / 2 + 0.25],
+      [canopyW / 2 - 0.25, -canopyD / 2 + 0.25],
+      [-canopyW / 2 + 0.25, canopyD / 2 - 0.25],
+      [canopyW / 2 - 0.25, canopyD / 2 - 0.25]
+    ];
+    colOffsets.forEach(([cx, cz]) => {
+      const col = createToonBox(0.1, f3CabinH - 0.1, 0.1, matSteelGrey, 20);
+      col.position.set(sideX + cx, (f3CabinH - 0.1) / 2, -0.2 + cz);
+      floor3Group.add(col);
+    });
+  });
+
+  // ----------------------------------------------------------------------------
+  // 8.1 船顶“長 江 航 道”大字、圆形徽标与海事雷达/航行灯
+  // ----------------------------------------------------------------------------
+  const signGroup = new THREE.Group();
+  signGroup.position.set(0, f3CabinH + 0.14, 0.8);
+  floor3Group.add(signGroup);
+
+  const signTrussBar = createToonBox(8.8, 0.14, 0.25, matHullDark, 20);
+  signTrussBar.position.set(0, 0.18, 0);
+  const signTopRail = createToonBox(8.4, 0.08, 0.08, matSteelGrey, 20);
+  signTopRail.position.set(0, 1.15, -0.12);
+  signGroup.add(signTrussBar, signTopRail);
+
+  for (let sx = -3.8; sx <= 3.8; sx += 1.52) {
+    const strut = createToonBox(0.08, 1.35, 0.08, matSteelGrey, 20);
+    strut.position.set(sx, 0.68, -0.12);
+    signGroup.add(strut);
+  }
+
+  const logoCylinder = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.95, 0.95, 0.2, 32),
+    makeToonMat(0x164a84)
+  );
+  logoCylinder.rotation.x = Math.PI / 2;
+  logoCylinder.position.set(0, 1.05, 0);
+  addOutline(logoCylinder, 25);
+  signGroup.add(logoCylinder);
+
+  const logoFrontFace = new THREE.Mesh(
+    new THREE.CircleGeometry(0.92, 32),
+    new THREE.MeshBasicMaterial({ map: createWaterwayLogoTexture() })
+  );
+  logoFrontFace.position.set(0, 1.05, 0.11);
+  signGroup.add(logoFrontFace);
+
+  // 【修改点6】：“长江航道”四个大字全面增加高质感暖金/霓虹亮灯，并在下方通过H15实现“单字不亮”隐患动态挂载
+  function createNeonCharTexture(char, isLit = true) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 256, 256);
+
+    ctx.font = '900 180px "Kaiti", "STKaiti", "KaiTi", "Microsoft YaHei", serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    if (isLit) {
+      // 亮灯发光态：鲜明金色霓虹光晕与高亮核心
+      ctx.shadowColor = '#f59e0b';
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 20;
+      ctx.strokeStyle = '#fffbeb';
+      ctx.strokeText(char, 128, 134);
+
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#fef08a';
+      ctx.fillText(char, 128, 134);
+    } else {
+      // 不亮故障态：内部灯管断电、灰暗无光
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#334155';
+      ctx.strokeText(char, 128, 134);
+
+      ctx.fillStyle = '#1e293b';
+      ctx.fillText(char, 128, 134);
+    }
+
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  // 常态基础标识字与霓虹灯点光源
+  const roofSignLight = new THREE.PointLight(0xfbbf24, 1.8, 11.0);
+  roofSignLight.position.set(0, 1.2, 0.9);
+  signGroup.add(roofSignLight);
+
+  const radarPedestal = createToonBox(0.35, 0.55, 0.35, matCabinWhite, 20);
+  radarPedestal.position.set(0, f3CabinH + 0.4, -1.3);
+  floor3Group.add(radarPedestal);
+
+  const radarScanner = createToonBox(1.35, 0.14, 0.24, matCabinWhite, 20);
+  radarScanner.position.set(0, f3CabinH + 0.75, -1.3);
+  floor3Group.add(radarScanner);
+
+  const portRedLight = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 10, 10),
+    new THREE.MeshBasicMaterial({ color: 0xff2222 })
+  );
+  portRedLight.position.set(-5.6, f3CabinH + 0.25, 2.2);
+  const starboardGreenLight = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 10, 10),
+    new THREE.MeshBasicMaterial({ color: 0x22ff55 })
+  );
+  starboardGreenLight.position.set(5.6, f3CabinH + 0.25, 2.2);
+  floor3Group.add(portRedLight, starboardGreenLight);
+
+  // ----------------------------------------------------------------------------
+  // 9. 前伸钢桁架引桥/栈桥
+  // ----------------------------------------------------------------------------
+  const gangwayGroup = new THREE.Group();
+  gangwayGroup.position.set(0, 0.82, 4.3);
+  boatGroup.add(gangwayGroup);
+
+  const bridgeLen = 9.6;
+  const bridgeWidth = 2.95;
+
+  const matGangwayGreen = makeToonMat(0xffffff, { map: createGreenGangwayTexture() });
+  const bridgeDeck = createToonBox(bridgeWidth, 0.18, bridgeLen, matGangwayGreen, 20);
+  bridgeDeck.position.set(0, 0, bridgeLen / 2);
+  gangwayGroup.add(bridgeDeck);
+
+  const landingPontoon = createToonBox(7.2, 0.95, 3.4, matDeckWet, 20);
+  landingPontoon.position.set(0, -0.52, bridgeLen + 0.8);
+  gangwayGroup.add(landingPontoon);
+
+  const landingHazardL = createToonBox(0.26, 0.22, 3.42, matHazard, 20);
+  landingHazardL.position.set(-2.1, -0.02, bridgeLen + 0.8);
+  const landingHazardR = createToonBox(0.26, 0.22, 3.42, matHazard, 20);
+  landingHazardR.position.set(2.1, -0.02, bridgeLen + 0.8);
+  gangwayGroup.add(landingHazardL, landingHazardR);
+
+  const bridgeRamp = createToonBox(bridgeWidth + 0.5, 0.12, 2.2, matGangwayGreen, 20);
+  bridgeRamp.position.set(0, -0.02, bridgeLen + 0.9);
+  bridgeRamp.rotation.x = 0.04;
+  gangwayGroup.add(bridgeRamp);
+
+  const trussHeight = 2.35;
+  const trussZPositions = [0.6, 2.6, 4.6, 6.6];
+  trussZPositions.forEach((tz, idx) => {
+    [-bridgeWidth / 2 - 0.08, bridgeWidth / 2 + 0.08].forEach((tx) => {
+      const post = createToonBox(0.18, trussHeight, 0.22, matSteelGrey, 20);
+      post.position.set(tx, trussHeight / 2, tz);
+      gangwayGroup.add(post);
+
+      if (idx < trussZPositions.length - 1) {
+        const diag = createToonBox(0.1, 2.65, 0.1, matFrameSilver, 20);
+        diag.position.set(tx, trussHeight / 2, tz + 1.0);
+        diag.rotation.x = idx % 2 === 0 ? 0.72 : -0.72;
+        gangwayGroup.add(diag);
+      }
+    });
+
+    const topBeam = createToonBox(bridgeWidth + 0.36, 0.18, 0.22, matSteelGrey, 20);
+    topBeam.position.set(0, trussHeight, tz);
+    gangwayGroup.add(topBeam);
+
+    const miniFlag = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.18), matFlagRed);
+    miniFlag.position.set(-bridgeWidth / 2 + 0.25, trussHeight - 0.22, tz);
+    gangwayGroup.add(miniFlag);
+  });
+
+  [-bridgeWidth / 2 - 0.08, bridgeWidth / 2 + 0.08].forEach((tx) => {
+    const topLongBeam = createToonBox(0.16, 0.16, 6.2, matSteelGrey, 20);
+    topLongBeam.position.set(tx, trussHeight, 3.6);
+    const midHandrail = createToonBox(0.1, 0.08, 7.6, matFrameSilver, 20);
+    midHandrail.position.set(tx, 1.05, 4.0);
+    gangwayGroup.add(topLongBeam, midHandrail);
+  });
+
+  [-1, 1].forEach((side) => {
+    const startP = new THREE.Vector3(side * (bridgeWidth / 2 + 0.08), 1.95, 6.6);
+    const endP = new THREE.Vector3(side * (bridgeWidth / 2 + 0.65), 0.05, bridgeLen + 1.55);
+    const linkCount = 22;
+    for (let i = 0; i <= linkCount; i++) {
+      const t = i / linkCount;
+      const pos = new THREE.Vector3().lerpVectors(startP, endP, t);
+      pos.y -= Math.sin(t * Math.PI) * 0.22;
+      const link = new THREE.Mesh(
+        new THREE.TorusGeometry(0.085, 0.026, 6, 12),
+        matHullBlack
+      );
+      link.position.copy(pos);
+      link.rotation.x = 0.6;
+      link.rotation.y = i % 2 === 0 ? 0.2 : 1.57;
+      gangwayGroup.add(link);
+    }
+  });
+
+  // ----------------------------------------------------------------------------
+  // 10. 栏杆、菱形几何花纹护栏、救生圈、标牌与外部斜梯
+  // ----------------------------------------------------------------------------
+  function addRailSegmentTo(parent, yBase, x1, z1, x2, z2, hasDiamondPattern = true) {
+    const rHeight = 0.85;
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    const cx = (x1 + x2) / 2;
+    const cz = (z1 + z2) / 2;
+    const angle = Math.atan2(dx, dz);
+
+    const segGroup = new THREE.Group();
+    segGroup.position.set(cx, yBase, cz);
+    segGroup.rotation.y = angle;
+    parent.add(segGroup);
+
+    const topBar = createToonBox(0.05, 0.05, len, matRailingWhite, 20);
+    topBar.position.y = rHeight;
+    const midBar = createToonBox(0.04, 0.04, len, matRailingWhite, 20);
+    midBar.position.y = rHeight * 0.52;
+    segGroup.add(topBar, midBar);
+
+    const numPosts = Math.max(2, Math.floor(len / 1.4));
+    for (let i = 0; i <= numPosts; i++) {
+      const pz = -len / 2 + (i / numPosts) * len;
+      const post = createToonBox(0.05, rHeight, 0.05, matRailingWhite, 20);
+      post.position.set(0, rHeight / 2, pz);
+      segGroup.add(post);
+
+      if (hasDiamondPattern && i < numPosts) {
+        const diamondZ = pz + (len / numPosts) * 0.5;
+        const diamond = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.14, 0),
+          matRailingWhite
+        );
+        diamond.scale.set(0.25, 0.85, 1.4);
+        diamond.position.set(0, rHeight * 0.35, diamondZ);
+        addOutline(diamond, 15);
+        segGroup.add(diamond);
+      }
+    }
+    return segGroup;
+  }
+
+  function buildDeckRailing(parent, yBase, width, depth, hasDiamondPattern = true, gapFrontCenter = 0, isFloor2 = false) {
+    const halfW = width / 2;
+    const halfD = depth / 2;
+
+    if (isFloor2) {
+      addRailSegmentTo(parent, yBase, -halfW, halfD, -7.5, halfD, hasDiamondPattern);
+      addRailSegmentTo(parent, yBase, -5.1, halfD, halfW, halfD, hasDiamondPattern);
+    } else if (gapFrontCenter > 0) {
+      addRailSegmentTo(parent, yBase, -halfW, halfD, -gapFrontCenter / 2, halfD, hasDiamondPattern);
+      addRailSegmentTo(parent, yBase, gapFrontCenter / 2, halfD, halfW, halfD, hasDiamondPattern);
+    } else {
+      addRailSegmentTo(parent, yBase, -halfW, halfD, halfW, halfD, hasDiamondPattern);
+    }
+    addRailSegmentTo(parent, yBase, -halfW, -halfD, -halfW, halfD, hasDiamondPattern);
+    addRailSegmentTo(parent, yBase, halfW, -halfD, halfW, halfD, hasDiamondPattern);
+    addRailSegmentTo(parent, yBase, -halfW, -halfD, halfW, -halfD, hasDiamondPattern);
+  }
+
+  buildDeckRailing(hullGroup, 0.77, 27.6, 9.7, false, 3.4, false);
+  buildDeckRailing(floor2Group, 0.14, f2DeckW - 0.25, f2DeckD - 0.25, true, 0, true);
+  buildDeckRailing(floor3Group, 0.12, f3DeckW - 0.25, f3DeckD - 0.25, false, 0, false);
+
+  function createLifebuoy() {
+    const buoyGroup = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.095, 12, 24), matLifeRingOrange);
+    addHullOutline(ring, 1.07);
+    buoyGroup.add(ring);
+
+    for (let a = 0; a < 4; a++) {
+      const band = new THREE.Mesh(
+        new THREE.TorusGeometry(0.32, 0.102, 10, 8, 0.35),
+        matPillowWhite
+      );
+      band.rotation.z = (a * Math.PI) / 2 + 0.2;
+      buoyGroup.add(band);
+    }
+    return buoyGroup;
+  }
+
+  // 【修改点2】：一楼前侧左外端 (-11.5, 1.22, 4.95) 留给 H08 救生圈老化损坏，其余 [-5.8, 5.8, 11.5] 为正常救生圈，彻底避开与积水重叠！
+  [-5.8, 5.8, 11.5].forEach((bx) => {
+    const b1 = createLifebuoy();
+    b1.position.set(bx, 1.22, 4.95);
+    hullGroup.add(b1);
+  });
+  [-11.5, 0, 11.5].forEach((bx) => {
+    const b1b = createLifebuoy();
+    b1b.position.set(bx, 1.22, -4.95);
+    hullGroup.add(b1b);
+  });
+
+  // 二层救生圈
+  [-9.2, -3.9, 3.9, 9.2].forEach((bx) => {
+    const b2 = createLifebuoy();
+    b2.position.set(bx, 0.56, 4.1);
+    floor2Group.add(b2);
+  });
+  [-9.2, -3.9, 3.9, 9.2].forEach((bx) => {
+    const b2b = createLifebuoy();
+    b2b.position.set(bx, 0.56, -4.1);
+    floor2Group.add(b2b);
+  });
+
+  // 三层救生圈
+  [-9.2, 7.2].forEach((bx) => {
+    const b3 = createLifebuoy();
+    b3.position.set(bx, 0.54, 4.0);
+    floor3Group.add(b3);
+  });
+  [-9.2, 7.2].forEach((bx) => {
+    const b3b = createLifebuoy();
+    b3b.position.set(bx, 0.54, -4.0);
+    floor3Group.add(b3b);
+  });
+
+  // 三楼右侧栏杆黄色航道标牌：“武道趸30402”
+  const wudaoSignMat = makeToonMat(0xffffff, {
+    map: createSignTexture('武道趸30402', '#eab308', '#78350f', '#92400e', 256, 96)
+  });
+  const wudaoSign = createToonBox(1.85, 0.68, 0.06, wudaoSignMat, 20);
+  wudaoSign.position.set(9.1, 0.54, f3DeckD / 2 - 0.06);
+  floor3Group.add(wudaoSign);
+
+  // 右侧连接一、二、三层的外部钢制斜梯
+  function createExteriorStairs(yBottom, height, xPos, zPos) {
+    const stairGroup = new THREE.Group();
+    stairGroup.position.set(xPos, yBottom, zPos);
+
+    const slope = Math.tan(0.45);
+    const totalDx = -slope * height;
+    const railLen = (height / Math.cos(0.45)) * 1.04;
+
+    [-0.30, 0.30].forEach(dz => {
+      const rail = createToonBox(0.06, railLen, 0.10, matHullDark, 20);
+      rail.position.set(totalDx / 2, height / 2, dz);
+      rail.rotation.z = 0.45;
+      stairGroup.add(rail);
+    });
+
+    for (let s = 1; s <= 7; s++) {
+      const t = s / 8;
+      const step = createToonBox(0.32, 0.05, 0.62, matSteelGrey, 20);
+      step.position.set(totalDx * t, t * height, 0);
+      stairGroup.add(step);
+    }
+    boatGroup.add(stairGroup);
+    return stairGroup;
+  }
+  createExteriorStairs(0.77, 2.5, 9.85, 1.3);
+  createExteriorStairs(3.27, 2.7, 9.65, 1.3);
+
+  // ----------------------------------------------------------------------------
+  // 11. 船舷与甲板分区陈设（【修改点7】：已移除一楼前后军绿色帆布箱）
+  // ----------------------------------------------------------------------------
+  function buildForedeckEquipment(sideSign) {
+    const zoneGroup = new THREE.Group();
+    zoneGroup.position.set(sideSign * 11.4, 0.77, -0.5);
+    boatGroup.add(zoneGroup);
+
+    // 甲板两侧红色“消防黄沙箱”
+    const sandBox = createToonBox(0.95, 0.62, 0.65, matFireRed, 20);
+    sandBox.position.set(-sideSign * 1.15, 0.31, -2.2);
+    const sandLabel = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.75, 0.32),
+      new THREE.MeshBasicMaterial({
+        map: createSignTexture('消防黄沙', '#dc2626', '#fef08a', '#fef08a', 160, 72)
+      })
+    );
+    sandLabel.position.set(0, 0.05, 0.34);
+    sandBox.add(sandLabel);
+    zoneGroup.add(sandBox);
+
+    // 堆放的黑色铸铁霍尔大铁锚
+    const anchorGroup = new THREE.Group();
+    anchorGroup.position.set(sideSign * 0.4, 0.16, 3.25);
+    anchorGroup.rotation.y = 0.45 * sideSign;
+    const shank = createToonBox(1.25, 0.14, 0.14, matHullBlack, 20);
+    const crown = createToonBox(0.26, 0.16, 0.85, matHullBlack, 20);
+    crown.position.x = 0.55;
+    const flukeL = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.5, 4), matHullBlack);
+    flukeL.rotation.z = Math.PI / 2;
+    flukeL.position.set(0.35, 0.05, 0.38);
+    const flukeR = flukeL.clone();
+    flukeR.position.z = -0.38;
+    const anchorRing = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 8, 16), matHullBlack);
+    anchorRing.rotation.x = Math.PI / 2;
+    anchorRing.position.x = -0.68;
+    anchorGroup.add(shank, crown, flukeL, flukeR, anchorRing);
+    zoneGroup.add(anchorGroup);
+
+    // 船舷双十字系缆桩
+    [-1.4, 1.2].forEach((bx) => {
+      const bollardBase = createToonBox(0.68, 0.08, 0.34, matHullBlack, 20);
+      bollardBase.position.set(bx, 0.04, 4.35);
+      [-0.18, 0.18].forEach((px) => {
+        const bPost = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.42, 12), matHullBlack);
+        bPost.position.set(bx + px, 0.24, 4.35);
+        const bCross = createToonBox(0.28, 0.06, 0.06, matHullBlack, 20);
+        bCross.position.set(bx + px, 0.32, 4.35);
+        zoneGroup.add(bPost, bCross);
+      });
+      zoneGroup.add(bollardBase);
+    });
+  }
+  buildForedeckEquipment(-1);
+  buildForedeckEquipment(1);
+
+  // 红色消防栓箱
+  function createFireCabinet(x, y, z, parent) {
+    const cab = createToonBox(0.62, 0.82, 0.22, matFireRed, 20);
+    cab.position.set(x, y, z);
+    const glassWin = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.44, 0.42),
+      new THREE.MeshBasicMaterial({ color: 0xfca5a5 })
+    );
+    glassWin.position.set(0, 0.1, 0.12);
+    const hoseCoil = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.04, 8, 16), matPillowWhite);
+    hoseCoil.position.set(0, 0.1, 0.13);
+    cab.add(glassWin, hoseCoil);
+    parent.add(cab);
+    return cab;
+  }
+  createFireCabinet(-8.4, 1.25, 2.9, floor2Group);
+  createFireCabinet(8.4, 1.25, 2.9, floor2Group);
+  createFireCabinet(-1.45, 1.25, f1CabinD / 2 + 0.05, floor1Group);
+  createFireCabinet(1.45, 1.25, f1CabinD / 2 + 0.05, floor1Group);
+
+  // 航道安全警示标语牌（字号已自适应缩小）
+  const signSafety1 = createToonBox(0.78, 0.36, 0.04, makeToonMat(0xffffff, {
+    map: createSignTexture('安全第一', '#ffffff', '#dc2626', '#dc2626', 192, 88)
+  }), 20);
+  signSafety1.position.set(-4.2, 1.88, 2.83);
+  floor2Group.add(signSafety1);
+
+  const signSafety2 = createToonBox(0.78, 0.36, 0.04, makeToonMat(0xffffff, {
+    map: createSignTexture('严禁烟火', '#ffffff', '#dc2626', '#dc2626', 192, 88)
+  }), 20);
+  signSafety2.position.set(0.0, 1.88, 2.83);
+  floor2Group.add(signSafety2);
+
+  const signSafety3 = createToonBox(0.78, 0.36, 0.04, makeToonMat(0xffffff, {
+    map: createSignTexture('注意防滑', '#fef08a', '#1e293b', '#ca8a04', 192, 88)
+  }), 20);
+  signSafety3.position.set(4.2, 1.88, 2.83);
+  floor2Group.add(signSafety3);
+
+  // 飘扬的红旗
+  const animatedFlags = [];
+  function createFlagpole(x, y, z, parent, scale = 1.0) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 2.8 * scale, 8), matFrameSilver);
+    pole.position.set(x, y + 1.4 * scale, z);
+    parent.add(pole);
+
+    const flagGeo = new THREE.PlaneGeometry(0.95 * scale, 0.62 * scale, 10, 6);
+    flagGeo.translate(0.475 * scale, 0, 0);
+    const flagMesh = new THREE.Mesh(flagGeo, matFlagRed);
+    flagMesh.position.set(x, y + 2.42 * scale, z);
+    parent.add(flagMesh);
+    animatedFlags.push({ mesh: flagMesh, baseGeo: flagGeo.clone(), phase: Math.random() * 6.28 });
+  }
+  createFlagpole(-10.5, 0.77, 3.6, boatGroup, 0.85);
+  createFlagpole(11.2, 0.77, 3.2, boatGroup, 1.05);
+  createFlagpole(12.2, 0.77, 3.2, boatGroup, 1.05);
+  createFlagpole(13.2, 0.77, 3.2, boatGroup, 1.05);
+
+  // ============================================================================
+  // 12. 船舷昏黄射灯、半透明体积光锥与萦绕飞虫
+  // ============================================================================
+  function createLightConeTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0.0, 'rgba(255, 205, 110, 0.52)');
+    grad.addColorStop(0.45, 'rgba(255, 180, 75, 0.18)');
+    grad.addColorStop(1.0, 'rgba(255, 160, 50, 0.0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 128, 256);
+    return new THREE.CanvasTexture(canvas);
+  }
+  const coneTex = createLightConeTexture();
+
+  const mothSwarms = [];
+  let flickeringSpotlight = null;
+
+  function createDeckSpotlight(x, y, z, rotZ, rotX, isRightStarboard = false) {
+    const spotGroup = new THREE.Group();
+    spotGroup.position.set(x, y, z);
+    boatGroup.add(spotGroup);
+
+    const arm = createToonBox(0.12, 0.35, 0.45, matHullDark, 20);
+    arm.position.set(0, 0.12, 0.15);
+    const hood = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.28, 12), matHullDark);
+    hood.position.set(0, 0, 0.35);
+    hood.rotation.z = rotZ;
+    hood.rotation.x = rotX;
+    addOutline(hood, 20);
+    spotGroup.add(arm, hood);
+
+    const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffe082 });
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 10), bulbMat);
+    bulb.position.set(0, -0.08, 0.35);
+    spotGroup.add(bulb);
+
+    const coneMat = new THREE.MeshBasicMaterial({
+      map: coneTex,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
+    });
+    const coneGeo = new THREE.ConeGeometry(2.1, 4.8, 20, 1, true);
+    coneGeo.translate(0, -2.4, 0);
+    const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+    coneMesh.position.set(0, -0.05, 0.35);
+    coneMesh.rotation.z = rotZ;
+    coneMesh.rotation.x = rotX;
+    spotGroup.add(coneMesh);
+
+    const pLight = new THREE.PointLight(0xffaa33, 1.35, 9.5, 1.7);
+    pLight.position.set(0, -0.35, 0.55);
+    spotGroup.add(pLight);
+
+    const swarmGroup = new THREE.Group();
+    swarmGroup.position.set(0, -0.45, 0.55);
+    spotGroup.add(swarmGroup);
+
+    const insects = [];
+    const bugMat = new THREE.MeshBasicMaterial({ color: 0xffe899 });
+    for (let i = 0; i < 14; i++) {
+      const bug = new THREE.Mesh(new THREE.PlaneGeometry(0.045, 0.045), bugMat);
+      swarmGroup.add(bug);
+      insects.push({
+        mesh: bug,
+        radius: 0.22 + Math.random() * 0.55,
+        speed: 2.5 + Math.random() * 3.5,
+        phase: Math.random() * Math.PI * 2,
+        yAmp: 0.12 + Math.random() * 0.25,
+        freqY: 3.0 + Math.random() * 4.0
+      });
+    }
+    mothSwarms.push({ group: swarmGroup, insects });
+
+    if (isRightStarboard) {
+      const sparkGroup = new THREE.Group();
+      sparkGroup.position.set(0, 0.05, 0.35);
+      for (let s = 0; s < 5; s++) {
+        const sp = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.18, 0.04),
+          new THREE.MeshBasicMaterial({ color: 0x67e8f9 })
+        );
+        sp.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        sparkGroup.add(sp);
+      }
+      spotGroup.add(sparkGroup);
+      flickeringSpotlight = { spotGroup, bulbMat, coneMat, pLight, sparkGroup, isHazardActive: true };
+    }
+    return spotGroup;
+  }
+
+  createDeckSpotlight(-10.8, 3.3, 3.4, -0.25, 0.15, false);
+  createDeckSpotlight(-4.2, 3.3, 3.6, 0.0, 0.2, false);
+  createDeckSpotlight(4.2, 3.3, 3.6, 0.0, 0.2, false);
+  createDeckSpotlight(10.8, 3.3, 3.4, 0.25, 0.15, true); // H01 右舷射灯
+
+  createDeckSpotlight(-1.55, 3.1, 10.8, -0.1, 0.1, false);
+  createDeckSpotlight(1.55, 3.1, 10.8, 0.1, 0.1, false);
+
+  const wetGlowTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = 128;
+    c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+    g.addColorStop(0, 'rgba(255, 175, 70, 0.42)');
+    g.addColorStop(0.5, 'rgba(255, 150, 50, 0.14)');
+    g.addColorStop(1, 'rgba(255, 140, 40, 0.0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
+  })();
+
+  roomCentersX.forEach((rx) => {
+    const glowPatch = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.5, 1.4),
+      new THREE.MeshBasicMaterial({
+        map: wetGlowTex,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    );
+    glowPatch.rotation.x = -Math.PI / 2;
+    glowPatch.position.set(rx, 0.17, 3.45);
+    floor2Group.add(glowPatch);
+  });
+
+  // ============================================================================
+  // 13. 构建全部安全隐患的 3D 模型（含隐患态与合规态）
+  // ============================================================================
+  const hazardSceneObjects = {};
+  const clickableHitboxes = [];
+
+  function registerHazardNode(id, badGroup, safeGroup, hitboxPos, hitboxSize) {
+    const data = HAZARD_DATABASE.find(h => h.id === id);
+
+    const hitboxGeo = new THREE.BoxGeometry(hitboxSize.x, hitboxSize.y, hitboxSize.z);
+    const hitboxMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.0,
+      depthWrite: false
+    });
+    const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
+    hitbox.position.copy(hitboxPos);
+    hitbox.userData.hazardId = id;
+    boatGroup.add(hitbox);
+    clickableHitboxes.push(hitbox);
+
+    const markerGroup = new THREE.Group();
+    markerGroup.position.copy(data.markerPos);
+    boatGroup.add(markerGroup);
+
+    const coreSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xf97316 })
+    );
+    const haloSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xfbbf24,
+        transparent: true,
+        opacity: 0.42,
+        depthWrite: false
+      })
+    );
+    coreSphere.userData.hazardId = id;
+    haloSphere.userData.hazardId = id;
+    markerGroup.add(coreSphere, haloSphere);
+    clickableHitboxes.push(coreSphere, haloSphere);
+
+    hazardSceneObjects[id] = {
+      id,
+      badGroup,
+      safeGroup,
+      hitbox,
+      markerGroup,
+      coreSphere,
+      haloSphere
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // H01: 右舷射灯接触不良
+  // --------------------------------------------------------------------------
+  {
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    boatGroup.add(badG, safeG);
+    registerHazardNode('H01', badG, safeG, new THREE.Vector3(10.8, 3.3, 3.7), new THREE.Vector3(1.8, 1.8, 1.8));
+  }
+
+  // --------------------------------------------------------------------------
+  // H02: 消防器材被遮挡（一层正门右侧消防柜前 (1.45, 0.77, 3.25)）
+  // --------------------------------------------------------------------------
+  {
+    const badG = new THREE.Group();
+    badG.position.set(1.45, 0.77, 3.25);
+    const crate1 = createToonBox(0.75, 0.55, 0.55, makeToonMat(0x2563eb), 20);
+    crate1.position.set(-0.1, 0.28, 0);
+    const crate2 = createToonBox(0.62, 0.48, 0.48, makeToonMat(0xd97706), 20);
+    crate2.position.set(-0.05, 0.78, -0.04);
+    crate2.rotation.y = 0.25;
+    const sack = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32, 1), makeToonMat(0x94a3b8));
+    sack.scale.set(1.1, 0.8, 0.9);
+    sack.position.set(0.45, 0.26, 0.1);
+    addHullOutline(sack, 1.06);
+    badG.add(crate1, crate2, sack);
+    boatGroup.add(badG);
+
+    const safeG = new THREE.Group();
+    boatGroup.add(safeG);
+
+    registerHazardNode('H02', badG, safeG, new THREE.Vector3(1.45, 1.5, 3.15), new THREE.Vector3(1.5, 1.7, 1.3));
+  }
+
+  // --------------------------------------------------------------------------
+  // H03: 甲板积水未清理（【修改点2】：移除绿色板子，未抽中或整改后直接恢复干净干燥甲板）
+  // --------------------------------------------------------------------------
+  {
+    const badG = new THREE.Group();
+    badG.position.set(-4.8, 0.78, 3.65);
+
+    const puddleMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.65
+    });
+    const puddle1 = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24), puddleMat);
+    puddle1.rotation.x = -Math.PI / 2;
+    puddle1.scale.set(1.35, 0.75, 1.0);
+    puddle1.position.y = 0.01;
+
+    const puddleOil = new THREE.Mesh(
+      new THREE.CircleGeometry(0.62, 20),
+      new THREE.MeshBasicMaterial({ color: 0xbae6fd, transparent: true, opacity: 0.78 })
+    );
+    puddleOil.rotation.x = -Math.PI / 2;
+    puddleOil.position.set(0.18, 0.015, 0.08);
+
+    const cloggedLeaves = createToonBox(0.34, 0.07, 0.34, makeToonMat(0x78350f), 20);
+    cloggedLeaves.position.set(-0.55, 0.04, 0.28);
+    badG.add(puddle1, puddleOil, cloggedLeaves);
+    boatGroup.add(badG);
+
+    // 合规状态为空组（甲板干净无积水、无多余绿板）
+    const safeG = new THREE.Group();
+    boatGroup.add(safeG);
+
+    registerHazardNode('H03', badG, safeG, new THREE.Vector3(-4.8, 1.0, 3.65), new THREE.Vector3(2.5, 0.9, 1.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // H04: 甲板杂物堆积（一层右前甲板走道 (6.6, 0.78, 3.45)）
+  // --------------------------------------------------------------------------
+  {
+    const badG = new THREE.Group();
+    badG.position.set(6.6, 0.78, 3.45);
+
+    const pallet = createToonBox(1.2, 0.12, 0.95, matLightWood, 20);
+    pallet.position.set(-0.2, 0.06, 0);
+    pallet.rotation.y = 0.35;
+
+    const oldTire1 = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.13, 10, 18), matHullBlack);
+    oldTire1.rotation.x = Math.PI / 2;
+    oldTire1.position.set(-0.25, 0.24, 0.05);
+    const oldTire2 = oldTire1.clone();
+    oldTire2.position.set(-0.15, 0.45, 0.1);
+    oldTire2.rotation.y = 0.25;
+
+    const paintCan1 = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.42, 12), makeToonMat(0xd97706));
+    paintCan1.position.set(0.55, 0.21, 0.2);
+    const paintCan2 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.38, 12), makeToonMat(0xef4444));
+    paintCan2.rotation.z = 1.45;
+    paintCan2.position.set(0.32, 0.16, -0.35);
+
+    const messyRope = new THREE.Mesh(new THREE.TorusKnotGeometry(0.24, 0.055, 36, 8), makeToonMat(0xb45309));
+    messyRope.rotation.x = Math.PI / 2;
+    messyRope.position.set(-0.75, 0.14, 0.25);
+
+    badG.add(pallet, oldTire1, oldTire2, paintCan1, paintCan2, messyRope);
+    boatGroup.add(badG);
+
+    const safeG = new THREE.Group();
+    boatGroup.add(safeG);
+
+    registerHazardNode('H04', badG, safeG, new THREE.Vector3(6.6, 1.2, 3.45), new THREE.Vector3(2.4, 1.4, 1.8));
+  }
+
+  // --------------------------------------------------------------------------
+  // H05: 配电箱盖未关闭（【修改点4】：移至一楼舱室左侧外墙 (-9.42, 2.05, 0.6)，朝左 -X）
+  // --------------------------------------------------------------------------
+  {
+    const boxPos = new THREE.Vector3(-9.42, 2.05, 0.6);
+
+    const elecMountGroup = new THREE.Group();
+    elecMountGroup.position.copy(boxPos);
+    elecMountGroup.rotation.y = -Math.PI / 2; // 朝向船体左舷外侧 (-X)
+    boatGroup.add(elecMountGroup);
+
+    // 配电箱主体与穿墙金属走线管
+    const elecBoxBody = createToonBox(0.74, 0.92, 0.24, matFrameSilver, 20);
+    const conduitPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.3, 8), matSteelGrey);
+    conduitPipe.position.set(0.18, -0.75, -0.02);
+    elecMountGroup.add(elecBoxBody, conduitPipe);
+
+    // 隐患状态：箱门向外敞开110度，内部露出红蓝黄断路器排与指示灯
+    const badG = new THREE.Group();
+    badG.position.copy(boxPos);
+    badG.rotation.y = -Math.PI / 2;
+
+    const innerPanel = createToonBox(0.62, 0.78, 0.05, matHullBlack, 20);
+    innerPanel.position.set(0, 0, 0.1);
+    const breakerRed = createToonBox(0.46, 0.15, 0.04, new THREE.MeshBasicMaterial({ color: 0xef4444 }), 20);
+    breakerRed.position.set(0, 0.2, 0.13);
+    const breakerBlue = createToonBox(0.46, 0.15, 0.04, new THREE.MeshBasicMaterial({ color: 0x38bdf8 }), 20);
+    breakerBlue.position.set(0, -0.04, 0.13);
+    const breakerYellow = createToonBox(0.46, 0.15, 0.04, new THREE.MeshBasicMaterial({ color: 0xfacc15 }), 20);
+    breakerYellow.position.set(0, -0.26, 0.13);
+
+    const openDoor = createToonBox(0.72, 0.9, 0.04, matFrameSilver, 20);
+    openDoor.position.set(-0.52, 0, 0.38);
+    openDoor.rotation.y = -1.95;
+    const warnSignOpen = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.48, 0.34),
+      new THREE.MeshBasicMaterial({
+        map: createSignTexture('当心触电', '#facc15', '#171717', '#171717', 160, 100)
+      })
+    );
+    warnSignOpen.position.set(0, 0.1, -0.03);
+    warnSignOpen.rotation.y = Math.PI;
+    openDoor.add(warnSignOpen);
+
+    badG.add(innerPanel, breakerRed, breakerBlue, breakerYellow, openDoor);
+    boatGroup.add(badG);
+
+    // 合规状态：箱门严密关闭
+    const safeG = new THREE.Group();
+    safeG.position.copy(boxPos);
+    safeG.rotation.y = -Math.PI / 2;
+    const closedDoor = createToonBox(0.72, 0.9, 0.04, matFrameSilver, 20);
+    closedDoor.position.set(0, 0, 0.12);
+    const warnSignClosed = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.5, 0.36),
+      new THREE.MeshBasicMaterial({
+        map: createSignTexture('当心触电', '#facc15', '#171717', '#171717', 160, 100)
+      })
+    );
+    warnSignClosed.position.set(0, 0.1, 0.03);
+    closedDoor.add(warnSignClosed);
+    safeG.add(closedDoor);
+    boatGroup.add(safeG);
+
+    registerHazardNode('H05', badG, safeG, new THREE.Vector3(-9.65, 2.05, 0.6), new THREE.Vector3(1.2, 1.4, 1.4));
+  }
+
+  // --------------------------------------------------------------------------
+  // H06: 灭火器已过期（二楼走廊中柱旁 (0.0, 3.42, 2.68)）
+  // --------------------------------------------------------------------------
+  {
+    const extPos = new THREE.Vector3(0.0, 3.42, 2.68);
+
+    const badG = new THREE.Group();
+    badG.position.copy(extPos);
+
+    const rustyMat = makeToonMat(0x7f1d1d);
+    const badTank1 = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.52, 14), rustyMat);
+    badTank1.position.set(-0.16, 0.26, 0);
+    addOutline(badTank1, 20);
+
+    const badTank2 = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.52, 14), rustyMat);
+    badTank2.position.set(0.22, 0.12, 0.12);
+    badTank2.rotation.z = -1.35;
+    badTank2.rotation.y = 0.3;
+    addOutline(badTank2, 20);
+
+    const expiredTag = createToonBox(0.52, 0.26, 0.03, makeToonMat(0xffffff, {
+      map: createSignTexture('过期未检', '#fef08a', '#dc2626', '#dc2626', 160, 88)
+    }), 20);
+    expiredTag.position.set(-0.16, 0.62, 0.12);
+
+    badG.add(badTank1, badTank2, expiredTag);
+    boatGroup.add(badG);
+
+    const safeG = new THREE.Group();
+    safeG.position.copy(extPos);
+    const holderBase = createToonBox(0.58, 0.14, 0.3, matFireRed, 20);
+    holderBase.position.set(0, 0.07, 0);
+    [-0.14, 0.14].forEach((ox) => {
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.52, 14), matFireRed);
+      tank.position.set(ox, 0.3, 0);
+      const nozzle = createToonBox(0.08, 0.12, 0.08, matHullBlack, 20);
+      nozzle.position.set(ox, 0.58, 0);
+      safeG.add(tank, nozzle);
+    });
+    const okTag = createToonBox(0.46, 0.22, 0.03, makeToonMat(0xffffff, {
+      map: createSignTexture('检验合格', '#dcfce7', '#15803d', '#16a34a', 160, 80)
+    }), 20);
+    okTag.position.set(0, 0.68, 0.1);
+    safeG.add(holderBase, okTag);
+    boatGroup.add(safeG);
+
+    registerHazardNode('H06', badG, safeG, new THREE.Vector3(0.0, 3.75, 2.75), new THREE.Vector3(1.2, 1.2, 1.0));
+  }
+
+  // --------------------------------------------------------------------------
+  // H07: 走廊护栏缺口（二楼走廊前侧左段 x: [-7.5, -5.1], z: 3.475）
+  // --------------------------------------------------------------------------
+  {
+    const safeG = new THREE.Group();
+    addRailSegmentTo(safeG, 0.14, -7.5, (f2DeckD - 0.25) / 2, -5.1, (f2DeckD - 0.25) / 2, true);
+    floor2Group.add(safeG);
+
+    const badG = new THREE.Group();
+    const brokenZ = (f2DeckD - 0.25) / 2;
+    const brokenPostL = createToonBox(0.06, 0.48, 0.06, matRailingWhite, 20);
+    brokenPostL.position.set(-7.35, 0.35, brokenZ);
+    brokenPostL.rotation.z = -0.38;
+
+    const brokenPostR = createToonBox(0.06, 0.42, 0.06, matRailingWhite, 20);
+    brokenPostR.position.set(-5.25, 0.32, brokenZ);
+    brokenPostR.rotation.z = 0.42;
+
+    const fallenBar = createToonBox(1.5, 0.05, 0.05, matRailingWhite, 20);
+    fallenBar.position.set(-6.3, 0.18, brokenZ - 0.25);
+    fallenBar.rotation.y = 0.18;
+
+    badG.add(brokenPostL, brokenPostR, fallenBar);
+    floor2Group.add(badG);
+
+    registerHazardNode('H07', badG, safeG, new THREE.Vector3(-6.3, 3.8, 3.45), new THREE.Vector3(2.6, 1.3, 1.0));
+  }
+
+  // --------------------------------------------------------------------------
+  // H08: 救生圈老化损坏（【修改点2】：移至一楼前栏杆左外端 (-11.5, 1.22, 4.95)，严丝合缝挂在栏杆上，直接表现为破损露芯老化态）
+  // --------------------------------------------------------------------------
+  {
+    const buoyPos = new THREE.Vector3(-11.5, 1.22, 4.95);
+
+    const badG = new THREE.Group();
+    badG.position.copy(buoyPos);
+
+    // 褪色发灰霉变的主圈体（带断裂豁口）
+    const weatheredMat = makeToonMat(0x78716c);
+    const crackedRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.32, 0.092, 10, 20, Math.PI * 1.68),
+      weatheredMat
+    );
+    crackedRing.rotation.z = 0.25;
+    addHullOutline(crackedRing, 1.06);
+
+    // 豁口处外露的发黄破损泡沫内芯
+    const foamCore = new THREE.Mesh(
+      new THREE.TorusGeometry(0.32, 0.065, 8, 8, Math.PI * 0.32),
+      makeToonMat(0xd6d3d1)
+    );
+    foamCore.rotation.z = 0.25 + Math.PI * 1.68;
+
+    // 剥落翘起的残破反光条与黑色霉斑块
+    const tornBand = createToonBox(0.12, 0.22, 0.04, makeToonMat(0xa8a29e), 20);
+    tornBand.position.set(-0.28, -0.15, 0.08);
+    tornBand.rotation.z = 0.55;
+
+    const moldPatch1 = new THREE.Mesh(new THREE.SphereGeometry(0.095, 8, 8), makeToonMat(0x292524));
+    moldPatch1.position.set(0.22, 0.22, 0.03);
+    const moldPatch2 = new THREE.Mesh(new THREE.SphereGeometry(0.085, 8, 8), makeToonMat(0x44403c));
+    moldPatch2.position.set(-0.18, 0.26, 0.02);
+
+    badG.add(crackedRing, foamCore, tornBand, moldPatch1, moldPatch2);
+    boatGroup.add(badG);
+
+    // 合规状态：挂在原位的崭新橙红救生圈
+    const safeG = new THREE.Group();
+    safeG.position.copy(buoyPos);
+    safeG.add(createLifebuoy());
+    boatGroup.add(safeG);
+
+    registerHazardNode('H08', badG, safeG, buoyPos, new THREE.Vector3(1.3, 1.3, 1.0));
+  }
+
+  // --------------------------------------------------------------------------
+  // H09: 引桥口无安全防护（引桥前端接岸坡道口 (0, 0.82, 14.2)）
+  // --------------------------------------------------------------------------
+  {
+    const badG = new THREE.Group();
+    badG.position.set(0, 0.82, 14.2);
+    const fallenSign = createToonBox(0.95, 0.55, 0.06, makeToonMat(0xffffff, {
+      map: createSignTexture('请穿救生衣', '#eab308', '#171717', '#171717', 192, 96)
+    }), 20);
+    fallenSign.rotation.x = -Math.PI / 2 + 0.1;
+    fallenSign.rotation.z = 0.35;
+    fallenSign.position.set(-1.35, 0.06, 0.6);
+    badG.add(fallenSign);
+    boatGroup.add(badG);
+
+    const safeG = new THREE.Group();
+    safeG.position.set(0, 0.82, 14.2);
+    [-1.65, 1.65].forEach((sx) => {
+      const post1 = createToonBox(0.1, 1.1, 0.1, matYellowSafety, 20);
+      post1.position.set(sx, 0.55, -0.9);
+      const post2 = createToonBox(0.1, 1.1, 0.1, matYellowSafety, 20);
+      post2.position.set(sx, 0.55, 1.1);
+      const topBar = createToonBox(0.08, 0.08, 2.1, matHazard, 20);
+      topBar.position.set(sx, 1.05, 0.1);
+      const midBar = createToonBox(0.06, 0.06, 2.1, matYellowSafety, 20);
+      midBar.position.set(sx, 0.55, 0.1);
+      safeG.add(post1, post2, topBar, midBar);
+    });
+    const standingSign = createToonBox(0.95, 0.55, 0.06, makeToonMat(0xffffff, {
+      map: createSignTexture('请穿救生衣', '#16a34a', '#ffffff', '#ffffff', 192, 96)
+    }), 20);
+    standingSign.position.set(-2.1, 0.95, 1.1);
+    safeG.add(standingSign);
+    boatGroup.add(safeG);
+
+    registerHazardNode('H09', badG, safeG, new THREE.Vector3(0, 1.35, 14.2), new THREE.Vector3(3.8, 1.6, 2.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // H10: 前舱盖板未关（【修改点2】：设置在左前甲板开阔区 (-11.2, 0.78, 1.5)，升级为高围板、支撑杆、外露铁爬梯与带加强筋绿色钢舱盖）
+  // --------------------------------------------------------------------------
+  {
+    const hatchPos = new THREE.Vector3(-11.2, 0.78, 1.5);
+    const matHatchGreen = makeToonMat(0x2f6f5e);
+
+    // 舱口高围板基座（四壁围板，中间留空洞口）
+    const coamingGroup = new THREE.Group();
+    coamingGroup.position.copy(hatchPos);
+    const cFront = createToonBox(1.56, 0.26, 0.14, matHazard, 20);
+    cFront.position.set(0, 0.13, 0.71);
+    const cBack = createToonBox(1.56, 0.26, 0.14, matHazard, 20);
+    cBack.position.set(0, 0.13, -0.71);
+    const cLeft = createToonBox(0.14, 0.26, 1.28, matHazard, 20);
+    cLeft.position.set(-0.71, 0.13, 0);
+    const cRight = createToonBox(0.14, 0.26, 1.28, matHazard, 20);
+    cRight.position.set(0.71, 0.13, 0);
+    coamingGroup.add(cFront, cBack, cLeft, cRight);
+    boatGroup.add(coamingGroup);
+
+    // 隐患状态：带加强筋与手轮的前舱钢盖板向后掀起 80 度，液压支撑杆支起，露出深邃底舱与伸出的黄色铁爬梯
+    const badG = new THREE.Group();
+    badG.position.copy(hatchPos);
+
+    const darkShaft = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.28, 1.28),
+      new THREE.MeshBasicMaterial({ color: 0x04070d })
+    );
+    darkShaft.rotation.x = -Math.PI / 2;
+    darkShaft.position.y = 0.05;
+
+    // 从底舱向上伸出的黄色铁爬梯（两根立管 + 3级横踏棍）
+    const ladderGroup = new THREE.Group();
+    ladderGroup.position.set(0, 0.22, 0.35);
+    ladderGroup.rotation.x = -0.18;
+    [-0.22, 0.22].forEach((lx) => {
+      const rail = createToonBox(0.05, 0.65, 0.05, matYellowSafety, 20);
+      rail.position.set(lx, 0.1, 0);
+      ladderGroup.add(rail);
+    });
+    [-0.1, 0.12, 0.34].forEach((ly) => {
+      const rung = createToonBox(0.44, 0.04, 0.04, matYellowSafety, 20);
+      rung.position.set(0, ly, 0);
+      ladderGroup.add(rung);
+    });
+
+    // 掀开的前舱水密钢盖板（铰接在后沿）
+    const openCoverPivot = new THREE.Group();
+    openCoverPivot.position.set(0, 0.26, -0.68);
+    openCoverPivot.rotation.x = 1.32; // 掀起约76度
+
+    const coverPlate = createToonBox(1.48, 0.09, 1.48, matHatchGreen, 20);
+    coverPlate.position.set(0, 0.045, 0.74);
+    // 盖板表面加强筋与中央手轮
+    const rib1 = createToonBox(1.3, 0.05, 0.08, matSteelGrey, 20);
+    rib1.position.set(0, 0.1, 0.42);
+    const rib2 = createToonBox(1.3, 0.05, 0.08, matSteelGrey, 20);
+    rib2.position.set(0, 0.1, 1.06);
+    const openWheel = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.032, 8, 16), matYellowSafety);
+    openWheel.rotation.x = Math.PI / 2;
+    openWheel.position.set(0, 0.13, 0.74);
+    openCoverPivot.add(coverPlate, rib1, rib2, openWheel);
+
+    // 侧边金属支撑杆
+    const propRod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.95, 8), matFrameSilver);
+    propRod.position.set(0.62, 0.62, -0.25);
+    propRod.rotation.x = -0.55;
+
+    badG.add(darkShaft, ladderGroup, openCoverPivot, propRod);
+    boatGroup.add(badG);
+
+    // 合规状态：前舱盖板平整严密合拢锁紧
+    const safeG = new THREE.Group();
+    safeG.position.copy(hatchPos);
+    const closedPlate = createToonBox(1.48, 0.09, 1.48, matHatchGreen, 20);
+    closedPlate.position.set(0, 0.28, 0);
+    const cRib1 = createToonBox(1.3, 0.05, 0.08, matSteelGrey, 20);
+    cRib1.position.set(0, 0.34, -0.32);
+    const cRib2 = createToonBox(1.3, 0.05, 0.08, matSteelGrey, 20);
+    cRib2.position.set(0, 0.34, 0.32);
+    const closedWheel = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.035, 8, 16), matYellowSafety);
+    closedWheel.rotation.x = Math.PI / 2;
+    closedWheel.position.set(0, 0.37, 0);
+    safeG.add(closedPlate, cRib1, cRib2, closedWheel);
+    boatGroup.add(safeG);
+
+    registerHazardNode('H10', badG, safeG, new THREE.Vector3(-11.2, 1.25, 1.5), new THREE.Vector3(1.9, 1.5, 1.9));
+  }
+
+  // --------------------------------------------------------------------------
+  // H12: 逃生梯道被占用（【修改点6】：油桶木箱对齐斜梯，安全逃生梯标牌直接挂在一楼右侧舱壁外墙上）
+  // --------------------------------------------------------------------------
+  {
+    const badG = new THREE.Group();
+    badG.position.set(9.25, 0.78, 1.3);
+
+    const oilDrum1 = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.78, 16), makeToonMat(0xb91c1c));
+    oilDrum1.position.set(0.35, 0.39, 0.0);
+    addOutline(oilDrum1, 20);
+
+    const oilDrum2 = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.72, 16), makeToonMat(0x1d4ed8));
+    oilDrum2.position.set(0.02, 0.95, 0.02);
+    oilDrum2.rotation.z = 0.25;
+    addOutline(oilDrum2, 20);
+
+    const blockingBox = createToonBox(0.58, 0.48, 0.52, matLightWood, 20);
+    blockingBox.position.set(-0.28, 1.48, 0.0);
+    blockingBox.rotation.y = 0.2;
+
+    badG.add(oilDrum1, oilDrum2, blockingBox);
+    boatGroup.add(badG);
+
+    // 合规状态：标牌平贴挂在一楼右侧舱壁外墙上（x = 9.43），完全不与楼梯重叠
+    const safeG = new THREE.Group();
+    const exitSign = createToonBox(0.82, 0.36, 0.04, makeToonMat(0xffffff, {
+      map: createSignTexture('安全逃生梯', '#15803d', '#ffffff', '#86efac', 192, 80)
+    }), 20);
+    exitSign.position.set(9.43, 2.35, 0.2);
+    exitSign.rotation.y = Math.PI / 2;
+    safeG.add(exitSign);
+    boatGroup.add(safeG);
+
+    registerHazardNode('H12', badG, safeG, new THREE.Vector3(9.35, 2.0, 1.3), new THREE.Vector3(1.8, 2.4, 1.5));
+  }
+
+  // --------------------------------------------------------------------------
+  // H13: 3楼值班室电热水壶干烧冒烟且无人看管（抽中时出现，合规态人员在岗水壶断电）
+  // --------------------------------------------------------------------------
+  const kettleSmokePuffs = [];
+  {
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    floor3Group.add(badG, safeG);
+
+    // 隐患状态：操作台中央电热水壶通电红灯常亮，剧烈冒白烟，值班椅空置无人！
+    const kBase = createToonBox(0.36, 0.04, 0.36, makeToonMat(0x1e293b), 15);
+    kBase.position.set(0.0, 0.86, 0.32);
+    const kBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.16, 0.34, 16),
+      makeToonMat(0xe2e8f0, { metalness: 0.85, roughness: 0.25 })
+    );
+    kBody.position.set(0.0, 1.05, 0.32);
+    addOutline(kBody, 15);
+
+    const kSpout = createToonBox(0.08, 0.14, 0.09, makeToonMat(0x94a3b8), 12);
+    kSpout.position.set(0.0, 1.15, 0.46);
+    kSpout.rotation.x = -0.35;
+
+    const kHandle = createToonBox(0.05, 0.26, 0.12, makeToonMat(0x1e293b), 12);
+    kHandle.position.set(0.0, 1.05, 0.16);
+
+    const kLedRed = new THREE.Mesh(
+      new THREE.SphereGeometry(0.022, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xff1e1e })
+    );
+    kLedRed.position.set(0.0, 0.89, 0.49);
+
+    // 冒烟水汽粒子群
+    const smokeGroup = new THREE.Group();
+    smokeGroup.position.set(0.0, 1.25, 0.48);
+    for (let i = 0; i < 9; i++) {
+      const puff = new THREE.Mesh(
+        new THREE.SphereGeometry(0.065, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false })
+      );
+      puff.position.set(
+        (Math.random() - 0.5) * 0.08,
+        i * 0.09,
+        (Math.random() - 0.5) * 0.08
+      );
+      smokeGroup.add(puff);
+      kettleSmokePuffs.push({ mesh: puff, offset: i * 0.11, baseY: i * 0.09 });
+    }
+
+    badG.add(kBase, kBody, kSpout, kHandle, kLedRed, smokeGroup);
+
+    // 合规状态：值班人员端坐在位，电热水壶电源断开拔插头、无烟无火
+    safeG.add(dutyOfficer.root);
+    const kSafeBody = kBody.clone();
+    const kSafeBase = kBase.clone();
+    const kSafeSpout = kSpout.clone();
+    const kSafeHandle = kHandle.clone();
+    const kLedGreen = new THREE.Mesh(
+      new THREE.SphereGeometry(0.02, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0x10b981 })
+    );
+    kLedGreen.position.set(0.0, 0.89, 0.49);
+    safeG.add(kSafeBody, kSafeBase, kSafeSpout, kSafeHandle, kLedGreen);
+
+    registerHazardNode('H13', badG, safeG, new THREE.Vector3(0.0, 6.85, -0.15), new THREE.Vector3(1.6, 1.6, 1.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // H14: 2层栏杆增加一个人依靠在上面打手机的隐患
+  // --------------------------------------------------------------------------
+  let leaningCallerChar = null;
+  {
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    floor2Group.add(badG, safeG);
+
+    // 隐患状态：二楼前沿走廊右侧护栏处，有一名船员身体大幅度倚靠在白色栏杆上打手机
+    const callerMan = createCrewCharacter(0x0284c7, 0x1e293b, 0x171717, false);
+    callerMan.root.position.set(4.5, 0.14, 3.9);
+    callerMan.root.rotation.y = -Math.PI * 0.08;
+    // 倚靠倾斜姿态
+    callerMan.root.rotation.x = -0.18;
+    callerMan.rightArmPivot.rotation.x = -1.15;
+    callerMan.rightArmPivot.rotation.z = -0.32;
+    callerMan.leftArmPivot.rotation.x = -0.45;
+    callerMan.headGroup.rotation.z = -0.15;
+
+    // 手机模型与发光微屏幕
+    const phone = createToonBox(0.06, 0.11, 0.02, makeToonMat(0x0f172a), 10);
+    phone.position.set(0.0, -0.36, 0.06);
+    const screenGlow = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.045, 0.085),
+      new THREE.MeshBasicMaterial({ color: 0x93c5fd })
+    );
+    screenGlow.position.set(0, 0, 0.015);
+    phone.add(screenGlow);
+    callerMan.rightArmPivot.add(phone);
+
+    badG.add(callerMan.root);
+    leaningCallerChar = callerMan;
+
+    // 合规状态：护栏无人倚靠，且栏杆上悬挂牢固规范的“严禁倚靠 · 当心坠江”警示牌
+    const safePlaque = createToonBox(0.72, 0.32, 0.05, makeToonMat(0xffffff, {
+      map: createSignTexture('严禁倚靠', '#dc2626', '#ffffff', '#ffffff', 180, 70)
+    }), 12);
+    safePlaque.position.set(4.5, 0.58, 4.12);
+    safeG.add(safePlaque);
+
+    registerHazardNode('H14', badG, safeG, new THREE.Vector3(4.5, 4.2, 4.1), new THREE.Vector3(1.6, 2.0, 1.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // H15: “长江航道”发光字增加亮灯，增加“航”字不亮的隐患
+  // --------------------------------------------------------------------------
+  {
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    signGroup.add(badG, safeG);
+
+    const charDefs = [
+      { char: '長', x: -3.35 },
+      { char: '江', x: -1.85 },
+      { char: '航', x: 1.85, isProblem: true },
+      { char: '道', x: 3.35 }
+    ];
+
+    // 1. 合规态：4个大字全部金黄灿烂通亮
+    charDefs.forEach(({ char, x }) => {
+      const tex = createNeonCharTexture(char, true);
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.15,
+        side: THREE.DoubleSide
+      });
+      for (let layer = 0; layer < 4; layer++) {
+        const p = new THREE.Mesh(new THREE.PlaneGeometry(1.45, 1.45), mat);
+        p.position.set(x, 0.98, layer * 0.035);
+        safeG.add(p);
+      }
+    });
+
+    // 2. 隐患态：“長”、“江”、“道”亮灯，“航”字故障断电完全不亮！
+    charDefs.forEach(({ char, x, isProblem }) => {
+      const tex = createNeonCharTexture(char, !isProblem);
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.15,
+        side: THREE.DoubleSide
+      });
+      for (let layer = 0; layer < 4; layer++) {
+        const p = new THREE.Mesh(new THREE.PlaneGeometry(1.45, 1.45), mat);
+        p.position.set(x, 0.98, layer * 0.035);
+        badG.add(p);
+      }
+    });
+
+    // 航字定位位于 x = 1.85, y = 5.97 + 2.35 + 0.14 + 0.98 = 9.44, z = 0.8
+    registerHazardNode('H15', badG, safeG, new THREE.Vector3(1.85, 9.2, 0.8), new THREE.Vector3(2.2, 2.2, 1.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // H16: 1层侧面增加“太平斧”标语，增加太平斧缺失的隐患
+  // --------------------------------------------------------------------------
+  {
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    boatGroup.add(badG, safeG);
+
+    const rackPosX = 9.43;
+    const rackPosY = 1.95;
+    const rackPosZ = -1.2;
+
+    // 标语红色底板
+    const rackPlate = createToonBox(0.06, 1.25, 1.45, makeToonMat(0x991b1b), 16);
+    rackPlate.position.set(rackPosX, rackPosY, rackPosZ);
+
+    // 醒目“应急破拆 · 太平斧”反光标语牌
+    const axeSign = createToonBox(0.07, 0.42, 1.35, makeToonMat(0xffffff, {
+      map: createSignTexture('太平斧专用位', '#dc2626', '#fef08a', '#fbbf24', 256, 85)
+    }), 16);
+    axeSign.position.set(rackPosX + 0.01, rackPosY + 0.38, rackPosZ);
+
+    // 左右两个U型挂架
+    const hookL = createToonBox(0.14, 0.06, 0.08, matSteelGrey, 10);
+    hookL.position.set(rackPosX + 0.05, rackPosY - 0.08, rackPosZ - 0.32);
+    const hookR = createToonBox(0.14, 0.06, 0.08, matSteelGrey, 10);
+    hookR.position.set(rackPosX + 0.05, rackPosY - 0.08, rackPosZ + 0.32);
+
+    // 隐患状态：挂架上空无一物（太平斧缺失），并悬挂断裂封条
+    badG.add(rackPlate, axeSign, hookL, hookR);
+    const brokenSeal = createToonBox(0.04, 0.18, 0.03, makeToonMat(0xfacc15), 8);
+    brokenSeal.position.set(rackPosX + 0.06, rackPosY - 0.15, rackPosZ);
+    badG.add(brokenSeal);
+
+    // 合规状态：底板挂架上稳妥悬挂标准船用消防太平斧
+    const safePlate = rackPlate.clone();
+    const safeSign = axeSign.clone();
+    const safeHookL = hookL.clone();
+    const safeHookR = hookR.clone();
+
+    // 太平斧：实木长柄 + 红色精钢斧头与反向破拆尖锥
+    const axeGroup = new THREE.Group();
+    axeGroup.position.set(rackPosX + 0.08, rackPosY - 0.05, rackPosZ);
+
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.95, 10), matLightWood);
+    handle.rotation.x = Math.PI / 2;
+    axeGroup.add(handle);
+
+    const axeHead = createToonBox(0.08, 0.28, 0.22, makeToonMat(0xef4444), 14);
+    axeHead.position.set(0.0, 0.06, -0.36);
+    const axePick = createToonBox(0.06, 0.08, 0.16, matSteelGrey, 12);
+    axePick.position.set(0.0, 0.04, -0.48);
+    axeGroup.add(axeHead, axePick);
+
+    safeG.add(safePlate, safeSign, safeHookL, safeHookR, axeGroup);
+
+    registerHazardNode('H16', badG, safeG, new THREE.Vector3(9.43, 1.95, -1.2), new THREE.Vector3(1.6, 1.6, 1.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // H17: 3楼会议室外侧合适位置电线破损裸露且有电火花闪现的隐患
+  // --------------------------------------------------------------------------
+  const sparkParticles = [];
+  let wireSparkLight = null;
+  {
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    floor3Group.add(badG, safeG);
+
+    // 位置：三楼会议室左侧外墙 (x = -5.35, y = 1.2, z = 0.4)
+    const conduitX = -5.35;
+    const conduitY = 1.2;
+    const conduitZ = 0.4;
+
+    // 隐患状态：穿线管风化折断，黑色绝缘皮裂开，裸露铜芯，伴随蓝色电弧火花闪烁
+    const wireUpper = createToonBox(0.08, 0.75, 0.08, makeToonMat(0x1e293b), 10);
+    wireUpper.position.set(conduitX, conduitY + 0.45, conduitZ);
+    const wireLower = createToonBox(0.08, 0.75, 0.08, makeToonMat(0x1e293b), 10);
+    wireLower.position.set(conduitX, conduitY - 0.45, conduitZ);
+
+    // 破裂处裸露的黄铜芯
+    const bareCopper = createToonBox(0.06, 0.16, 0.06, makeToonMat(0xf59e0b, { emissive: 0xd97706, emissiveIntensity: 0.6 }), 12);
+    bareCopper.position.set(conduitX, conduitY, conduitZ);
+
+    // 电火花星芒群与跳火光源
+    const sparkCluster = new THREE.Group();
+    sparkCluster.position.set(conduitX - 0.04, conduitY, conduitZ);
+    for (let i = 0; i < 7; i++) {
+      const sp = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.045, 0),
+        new THREE.MeshBasicMaterial({ color: 0x60a5fa })
+      );
+      sparkCluster.add(sp);
+      sparkParticles.push({
+        mesh: sp,
+        speedX: (Math.random() - 0.5) * 0.8,
+        speedY: (Math.random() - 0.5) * 0.8,
+        speedZ: (Math.random() - 0.5) * 0.8
+      });
+    }
+
+    wireSparkLight = new THREE.PointLight(0x38bdf8, 1.8, 6.0);
+    wireSparkLight.position.set(conduitX - 0.1, conduitY, conduitZ);
+    badG.add(wireUpper, wireLower, bareCopper, sparkCluster, wireSparkLight);
+
+    // 合规状态：全封闭镀锌防雨穿线钢管 + 铸铝防爆分线盒 + 规范密封标识
+    const safeSteelPipe = createToonBox(0.09, 1.65, 0.09, matSteelGrey, 12);
+    safeSteelPipe.position.set(conduitX, conduitY, conduitZ);
+    const junctionBox = createToonBox(0.18, 0.22, 0.18, makeToonMat(0x334155), 14);
+    junctionBox.position.set(conduitX - 0.02, conduitY, conduitZ);
+    const safetyTag = createToonBox(0.02, 0.12, 0.14, makeToonMat(0xfacc15), 10);
+    safetyTag.position.set(conduitX - 0.1, conduitY - 0.15, conduitZ);
+    safeG.add(safeSteelPipe, junctionBox, safetyTag);
+
+    registerHazardNode('H17', badG, safeG, new THREE.Vector3(-5.35, 7.17, -0.1), new THREE.Vector3(1.6, 1.6, 1.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // 提示高亮光环特效
+  // --------------------------------------------------------------------------
+  const hintHighlightGroup = new THREE.Group();
+  hintHighlightGroup.visible = false;
+  boatGroup.add(hintHighlightGroup);
+
+  const hintRing1 = new THREE.Mesh(
+    new THREE.TorusGeometry(0.75, 0.06, 12, 32),
+    new THREE.MeshBasicMaterial({ color: 0x22d3ee })
+  );
+  hintRing1.rotation.x = Math.PI / 2;
+  const hintRing2 = new THREE.Mesh(
+    new THREE.TorusGeometry(0.95, 0.04, 12, 32),
+    new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+  );
+  const hintBeacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.55, 3.2, 16, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0xfacc15,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    })
+  );
+  hintBeacon.position.y = 1.6;
+  hintHighlightGroup.add(hintRing1, hintRing2, hintBeacon);
+
+  // ============================================================================
+  // 14. 动态降雨系统、屋檐滴水与水花涟漪
+  // ============================================================================
+  const rainCount = 1500;
+  const rainGeo = new THREE.BufferGeometry();
+  const rainPositions = new Float32Array(rainCount * 6);
+  const rainVelocities = new Float32Array(rainCount);
+
+  for (let i = 0; i < rainCount; i++) {
+    const x = (Math.random() - 0.5) * 42;
+    const y = Math.random() * 24;
+    const z = (Math.random() - 0.5) * 32 + 2.5;
+    const streakLen = 0.65 + Math.random() * 0.45;
+
+    rainPositions[i * 6] = x;
+    rainPositions[i * 6 + 1] = y;
+    rainPositions[i * 6 + 2] = z;
+
+    rainPositions[i * 6 + 3] = x - 0.08;
+    rainPositions[i * 6 + 4] = y - streakLen;
+    rainPositions[i * 6 + 5] = z;
+
+    rainVelocities[i] = 16 + Math.random() * 8;
+  }
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+
+  const rainMat = new THREE.LineBasicMaterial({
+    color: 0x8ab4e8,
+    transparent: true,
+    opacity: 0.36
+  });
+  const rainLines = new THREE.LineSegments(rainGeo, rainMat);
+  dioramaGroup.add(rainLines);
+
+  const eavesDrips = [];
+  const dripMat = new THREE.MeshBasicMaterial({
+    color: 0xcce4ff,
+    transparent: true,
+    opacity: 0.78
+  });
+  const splashMat = new THREE.MeshBasicMaterial({
+    color: 0xdbeafe,
+    transparent: true,
+    opacity: 0.65,
+    side: THREE.DoubleSide
+  });
+
+  const dripEmitPoints = [
+    [-9.5, 8.2, 2.0, 3.45],
+    [-6.2, 8.2, 2.0, 3.45],
+    [-2.5, 8.3, 2.8, 3.45],
+    [2.5, 8.3, 2.8, 3.45],
+    [6.2, 8.2, 2.0, 3.45],
+    [9.5, 8.2, 2.0, 3.45],
+    [-8.0, 3.25, 3.6, 0.82],
+    [-3.2, 3.25, 3.6, 0.82],
+    [3.2, 3.25, 3.6, 0.82],
+    [8.0, 3.25, 3.6, 0.82]
+  ];
+
+  dripEmitPoints.forEach(([dx, startY, dz, targetY], idx) => {
+    const dropMesh = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.16, 6), dripMat);
+    dropMesh.position.set(dx, startY, dz);
+    boatGroup.add(dropMesh);
+
+    const splashRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.04, 0.08, 16),
+      splashMat.clone()
+    );
+    splashRing.rotation.x = -Math.PI / 2;
+    splashRing.position.set(dx, targetY + 0.02, dz);
+    boatGroup.add(splashRing);
+
+    eavesDrips.push({
+      dropMesh,
+      splashRing,
+      startY,
+      targetY,
+      progress: (idx * 0.23) % 1.0,
+      speed: 0.65 + (idx % 3) * 0.15
+    });
+  });
+
+  // ============================================================================
+  // 15. 游戏状态管理与交互逻辑
+  // ============================================================================
+  const DIFFICULTY_CONFIG = {
+    easy: { label: '简单模式', count: 6, timeSec: 150, showMarkers: true },
+    normal: { label: '普通模式', count: 8, timeSec: 105, showMarkers: true },
+    hard: { label: '困难模式', count: 10, timeSec: 75, showMarkers: false }
+  };
+
+  const gameState = {
+    isPlaying: false,
+    isFreeMode: false,
+    difficulty: 'easy',
+    activeHazardIds: [],
+    foundHazardIds: [],
+    remainingTime: 150,
+    hintsUsed: 0,
+    hintEndTime: 0,
+    pendingRectifyId: null
+  };
+
+  const hudTop = document.getElementById('hud-top');
+  const hudBottom = document.getElementById('hud-bottom');
+  const hudDiffBadge = document.getElementById('hud-diff-badge');
+  const hudProgress = document.getElementById('hud-progress');
+  const hudTimerBox = document.getElementById('hud-timer-box');
+  const hudTimer = document.getElementById('hud-timer');
+  const btnHint = document.getElementById('btn-hint');
+  const btnList = document.getElementById('btn-list');
+  const btnMenu = document.getElementById('btn-menu');
+  const startModal = document.getElementById('start-modal');
+  const hazardPopup = document.getElementById('hazard-popup');
+  const resultModal = document.getElementById('result-modal');
+  const freeViewBar = document.getElementById('free-view-bar');
+  const toastEl = document.getElementById('toast-msg');
+
+  let toastTimeout = null;
+  function showToast(msg, duration = 2400) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+      toastEl.classList.remove('show');
+    }, duration);
+  }
+
+  function formatTime(sec) {
+    const s = Math.max(0, Math.ceil(sec));
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return `${String(m).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
+  }
+
+  // 【修改点3】：已整改的隐患隐藏脉冲球并禁用碰撞盒，彻底不可再次点击
+  function syncSceneHazards() {
+    const cfg = DIFFICULTY_CONFIG[gameState.difficulty];
+    HAZARD_DATABASE.forEach((h) => {
+      const node = hazardSceneObjects[h.id];
+      if (!node) return;
+
+      const isSelectedInRound = gameState.activeHazardIds.includes(h.id);
+      const isFound = gameState.foundHazardIds.includes(h.id);
+
+      const showHazardState = isSelectedInRound && !isFound;
+      node.badGroup.visible = showHazardState;
+      node.safeGroup.visible = !showHazardState;
+
+      if (h.id === 'H01' && flickeringSpotlight) {
+        flickeringSpotlight.isHazardActive = showHazardState;
+        flickeringSpotlight.sparkGroup.visible = showHazardState;
+      }
+
+      // 脉冲球仅在未整改且为简单/普通模式时显示；整改后立即隐藏
+      if (gameState.isFreeMode || !cfg.showMarkers || !showHazardState) {
+        node.markerGroup.visible = false;
+      } else {
+        node.markerGroup.visible = true;
+        node.coreSphere.material.color.setHex(0xf97316);
+        node.haloSphere.material.color.setHex(0xfbbf24);
+      }
+    });
+  }
+
+  function updateHUD() {
+    const total = gameState.activeHazardIds.length;
+    const found = gameState.foundHazardIds.length;
+    hudProgress.textContent = `${found} / ${total}`;
+    hudTimer.textContent = formatTime(gameState.remainingTime);
+
+    if (gameState.remainingTime <= 30) {
+      hudTimerBox.classList.add('danger');
+    } else {
+      hudTimerBox.classList.remove('danger');
+    }
+
+    btnHint.disabled = !gameState.isPlaying || found >= total || gameState.remainingTime <= 30;
+  }
+
+  function startNewGame(diffKey) {
+    const cfg = DIFFICULTY_CONFIG[diffKey];
+    gameState.difficulty = diffKey;
+    gameState.isPlaying = true;
+    gameState.isFreeMode = false;
+    gameState.remainingTime = cfg.timeSec;
+    gameState.foundHazardIds = [];
+    gameState.hintsUsed = 0;
+    gameState.hintEndTime = 0;
+    savedCameraState = null;
+    hintHighlightGroup.visible = false;
+
+    const shuffled = [...HAZARD_DATABASE].sort(() => Math.random() - 0.5);
+    gameState.activeHazardIds = shuffled.slice(0, cfg.count).map(h => h.id);
+
+    hudDiffBadge.textContent = cfg.label;
+    startModal.classList.add('hidden');
+    resultModal.classList.add('hidden');
+    hazardPopup.classList.add('hidden');
+    freeViewBar.style.display = 'none';
+    hudTop.classList.remove('hidden');
+    hudBottom.classList.remove('hidden');
+
+    syncSceneHazards();
+    updateHUD();
+    flyCameraTo(defaultCamPos, defaultCamTarget, 0.9);
+    showToast(`已开启【${cfg.label}】，本局共随机生成 ${cfg.count} 处安全隐患！`);
+  }
+
+  function enterFreeViewMode() {
+    gameState.isPlaying = false;
+    gameState.isFreeMode = true;
+    gameState.activeHazardIds = ['H01'];
+    gameState.foundHazardIds = [];
+    savedCameraState = null;
+    hintHighlightGroup.visible = false;
+
+    startModal.classList.add('hidden');
+    resultModal.classList.add('hidden');
+    hazardPopup.classList.add('hidden');
+    hudTop.classList.add('hidden');
+    hudBottom.classList.add('hidden');
+    freeViewBar.style.display = 'block';
+
+    syncSceneHazards();
+    flyCameraTo(defaultCamPos, defaultCamTarget, 0.9);
+  }
+
+  // 【修改点1】：弹出隐患详情时先保存玩家当前视角，适度拉近特写；整改关闭后平滑恢复原视角
+  function openHazardPopup(hazardId, isReviewOnly = false) {
+    const data = HAZARD_DATABASE.find(h => h.id === hazardId);
+    if (!data) return;
+
+    // 仅在弹窗未打开时记录玩家原本的观察视角
+    if (hazardPopup.classList.contains('hidden')) {
+      savedCameraState = {
+        pos: camera.position.clone(),
+        target: controls.target.clone()
+      };
+    }
+
+    gameState.pendingRectifyId = hazardId;
+    document.getElementById('pop-id').textContent = data.id;
+    document.getElementById('pop-stars').textContent = `${data.stars} · ${data.needEnter}`;
+    document.getElementById('pop-title').textContent = data.name;
+    document.getElementById('pop-desc').textContent = data.desc;
+    document.getElementById('pop-rectify').textContent = data.rectify;
+
+    const confirmBtn = document.getElementById('btn-confirm-rectify');
+    if (isReviewOnly || gameState.foundHazardIds.includes(hazardId)) {
+      confirmBtn.textContent = '👍 关闭详情并恢复视角';
+    } else {
+      confirmBtn.textContent = '✅ 立即现场整改并恢复视角';
+    }
+
+    hazardPopup.classList.remove('hidden');
+    flyCameraTo(data.camPos, data.camTarget, 0.72);
+  }
+
+  // 确认整改并恢复之前的相机视角
+  document.getElementById('btn-confirm-rectify').addEventListener('click', () => {
+    const id = gameState.pendingRectifyId;
+    hazardPopup.classList.add('hidden');
+
+    // 恢复点击前的相机位置与视角
+    if (savedCameraState) {
+      flyCameraTo(savedCameraState.pos, savedCameraState.target, 0.78);
+      savedCameraState = null;
+    }
+
+    if (id && gameState.isPlaying && !gameState.foundHazardIds.includes(id)) {
+      gameState.foundHazardIds.push(id);
+      hintHighlightGroup.visible = false;
+      syncSceneHazards();
+      updateHUD();
+
+      const data = HAZARD_DATABASE.find(h => h.id === id);
+      showToast(`🛠️ 已完成【${data.name}】现场整改！（${gameState.foundHazardIds.length}/${gameState.activeHazardIds.length}）`);
+
+      if (gameState.foundHazardIds.length >= gameState.activeHazardIds.length) {
+        setTimeout(() => finishGame(true), 650);
+      }
+    }
+  });
+
+  // 触发💡提示按钮
+  btnHint.addEventListener('click', () => {
+    if (!gameState.isPlaying) return;
+    const unfound = gameState.activeHazardIds.filter(id => !gameState.foundHazardIds.includes(id));
+    if (unfound.length === 0) return;
+
+    if (gameState.remainingTime <= 15) {
+      showToast('⚠️ 剩余时间不足 15 秒，无法使用提示！');
+      return;
+    }
+
+    gameState.remainingTime -= 15;
+    gameState.hintsUsed++;
+    updateHUD();
+
+    const targetId = unfound[Math.floor(Math.random() * unfound.length)];
+    const targetData = HAZARD_DATABASE.find(h => h.id === targetId);
+
+    hintHighlightGroup.position.copy(targetData.markerPos);
+    hintHighlightGroup.visible = true;
+    gameState.hintEndTime = performance.now() + 3000;
+
+    flyCameraTo(targetData.camPos, targetData.camTarget, 0.85);
+    showToast(`💡 提示已激活 (-15秒)：请注意高亮光柱位置【${targetData.needEnter}】！`, 3000);
+  });
+
+  function showSummaryModal(titleText, subText) {
+    document.getElementById('res-title').textContent = titleText;
+    document.getElementById('res-subtitle').innerHTML = subText;
+
+    const listEl = document.getElementById('res-list');
+    listEl.innerHTML = '';
+
+    gameState.activeHazardIds.forEach((id) => {
+      const h = HAZARD_DATABASE.find(item => item.id === id);
+      const isFound = gameState.foundHazardIds.includes(id);
+      const row = document.createElement('div');
+      row.className = 'summary-item';
+      row.innerHTML = `
+        <div>
+          <strong>${h.id} · ${h.name}</strong>
+          <div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">${h.stars} | ${h.needEnter}（点击定位复盘）</div>
+        </div>
+        <span class="${isFound ? 'status-ok' : 'status-miss'}">
+          ${isFound ? '✅ 已整改' : '❌ 未排查'}
+        </span>
+      `;
+      row.addEventListener('click', () => {
+        resultModal.classList.add('hidden');
+        openHazardPopup(h.id, true);
+      });
+      listEl.appendChild(row);
+    });
+
+    resultModal.classList.remove('hidden');
+  }
+
+  function finishGame(isWin) {
+    gameState.isPlaying = false;
+    hintHighlightGroup.visible = false;
+    const cfg = DIFFICULTY_CONFIG[gameState.difficulty];
+    const usedSec = cfg.timeSec - Math.floor(gameState.remainingTime);
+
+    if (isWin) {
+      showSummaryModal(
+        '🎉 排查圆满完成！平安航道守护者',
+        `您在【${cfg.label}】中用时 <strong>${usedSec}秒</strong> 找出了全部 <strong>${cfg.count}处</strong> 安全隐患（使用提示 ${gameState.hintsUsed} 次）。<br/>点击下方任意条目可定位复盘隐患详情：`
+      );
+    } else {
+      showSummaryModal(
+        '⏰ 巡检时间到！排查未完成',
+        `本局共排查出 <strong>${gameState.foundHazardIds.length} / ${cfg.count}</strong> 处安全隐患。<br/>点击下方列表可自动将视角移至遗漏的隐患位置进行复盘学习：`
+      );
+    }
+  }
+
+  document.querySelectorAll('.diff-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      if (!window.__APP_STATUS__.sceneReady) {
+        showToast('⏳ 3D微缩长江趸船模型正在载入中，请稍候片刻...');
+        return;
+      }
+      startNewGame(card.getAttribute('data-diff'));
+    });
+  });
+
+  document.getElementById('btn-free-mode').addEventListener('click', () => {
+    if (!window.__APP_STATUS__.sceneReady) {
+      showToast('⏳ 3D微缩长江趸船模型正在载入中，请稍候片刻...');
+      return;
+    }
+    enterFreeViewMode();
+  });
+  document.getElementById('btn-exit-free').addEventListener('click', () => {
+    startModal.classList.remove('hidden');
+  });
+
+  btnMenu.addEventListener('click', () => {
+    startModal.classList.remove('hidden');
+  });
+
+  btnList.addEventListener('click', () => {
+    showSummaryModal(
+      '📋 本局安全隐患排查记录',
+      `当前已排查 <strong>${gameState.foundHazardIds.length} / ${gameState.activeHazardIds.length}</strong> 处隐患（点击条目可定位查看）：`
+    );
+  });
+
+  document.getElementById('btn-res-close').addEventListener('click', () => {
+    resultModal.classList.add('hidden');
+  });
+
+  document.getElementById('btn-res-restart').addEventListener('click', () => {
+    resultModal.classList.add('hidden');
+    startModal.classList.remove('hidden');
+  });
+
+  // 底部快捷视角切换
+  const QUICK_VIEWS = {
+    overview: { pos: defaultCamPos, target: defaultCamTarget },
+    gangway: { pos: new THREE.Vector3(4.2, 4.0, 21.0), target: new THREE.Vector3(0, 1.0, 13.5) },
+    deck1: { pos: new THREE.Vector3(0.0, 4.8, 13.5), target: new THREE.Vector3(0, 1.4, 2.8) },
+    leftSide: { pos: new THREE.Vector3(-18.5, 5.2, 5.5), target: new THREE.Vector3(-10.2, 1.6, 1.2) },
+    floor2: { pos: new THREE.Vector3(0.0, 5.5, 11.2), target: new THREE.Vector3(0, 3.8, 2.4) },
+    rightSide: { pos: new THREE.Vector3(17.8, 4.8, 5.5), target: new THREE.Vector3(9.4, 2.0, 1.1) }
+  };
+
+  document.querySelectorAll('.cam-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const v = QUICK_VIEWS[chip.getAttribute('data-view')];
+      if (v) flyCameraTo(v.pos, v.target, 0.85);
+    });
+  });
+
+  // ============================================================================
+  // 16. 射线检测（【修改点3】：过滤已整改的隐患，整改后不再响应点击）
+  // ============================================================================
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  let pointerDownPos = { x: 0, y: 0 };
+
+  renderer.domElement.addEventListener('pointerdown', (e) => {
+    pointerDownPos.x = e.clientX;
+    pointerDownPos.y = e.clientY;
+  });
+
+  renderer.domElement.addEventListener('pointerup', (e) => {
+    if (gameState.isFreeMode || !gameState.isPlaying) return;
+    if (!hazardPopup.classList.contains('hidden')) return;
+
+    const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+    if (moveDist > 9) return;
+
+    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(clickableHitboxes, false);
+
+    if (intersects.length > 0) {
+      for (const hit of intersects) {
+        const hId = hit.object.userData.hazardId;
+        // 仅当该隐患属于本局抽中且尚未被整改时，才触发点击弹窗
+        if (
+          hId &&
+          gameState.activeHazardIds.includes(hId) &&
+          !gameState.foundHazardIds.includes(hId)
+        ) {
+          openHazardPopup(hId);
+          return;
+        }
+      }
+    }
+  });
+
+  // ============================================================================
+  // 17. 动画主循环
+  // ============================================================================
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const delta = Math.min(clock.getDelta(), 0.05);
+    const elapsed = clock.getElapsedTime();
+
+    if (camTransition) {
+      camTransition.elapsed += delta;
+      const t = Math.min(1.0, camTransition.elapsed / camTransition.duration);
+      const ease = 1 - Math.pow(1 - t, 3);
+      camera.position.lerpVectors(camTransition.startPos, camTransition.endPos, ease);
+      controls.target.lerpVectors(camTransition.startTarget, camTransition.endTarget, ease);
+      if (t >= 1.0) camTransition = null;
+    }
+    controls.update();
+
+    if (gameState.isPlaying) {
+      gameState.remainingTime -= delta;
+      if (gameState.remainingTime <= 0) {
+        gameState.remainingTime = 0;
+        updateHUD();
+        finishGame(false);
+      } else {
+        updateHUD();
+      }
+    }
+
+    if (hintHighlightGroup.visible) {
+      hintRing1.rotation.z = elapsed * 3.0;
+      hintRing2.rotation.x = elapsed * 2.5;
+      hintRing2.rotation.y = elapsed * 2.0;
+      const s = 1.0 + Math.sin(elapsed * 8.0) * 0.18;
+      hintHighlightGroup.scale.set(s, 1.0, s);
+      if (performance.now() > gameState.hintEndTime) {
+        hintHighlightGroup.visible = false;
+      }
+    }
+
+    HAZARD_DATABASE.forEach((h, idx) => {
+      const node = hazardSceneObjects[h.id];
+      if (node && node.markerGroup.visible) {
+        const pulse = 1.0 + Math.sin(elapsed * 4.2 + idx) * 0.22;
+        node.haloSphere.scale.setScalar(pulse);
+        node.haloSphere.material.opacity = 0.48 - Math.sin(elapsed * 4.2 + idx) * 0.2;
+      }
+    });
+
+    waterUniforms.uTime.value = elapsed;
+
+    boatGroup.position.y = Math.sin(elapsed * 1.35) * 0.045;
+    boatGroup.rotation.z = Math.sin(elapsed * 0.95) * 0.0045;
+    boatGroup.rotation.x = Math.cos(elapsed * 1.15) * 0.0035;
+    radarScanner.rotation.y = elapsed * 1.8;
+
+    let flickerFactor = 1.0;
+    if (flickeringSpotlight && flickeringSpotlight.isHazardActive) {
+      const cycle = elapsed % 5.5;
+      if (
+        (cycle > 1.2 && cycle < 1.32) ||
+        (cycle > 1.4 && cycle < 1.58) ||
+        (cycle > 3.6 && cycle < 3.78)
+      ) {
+        flickerFactor = 0.1 + Math.random() * 0.25;
+      } else if (cycle > 1.58 && cycle < 1.85) {
+        flickerFactor = 0.6 + Math.sin(elapsed * 45) * 0.3;
+      }
+      flickeringSpotlight.sparkGroup.visible = flickerFactor < 0.45;
+      flickeringSpotlight.sparkGroup.rotation.y = elapsed * 12.0;
+    }
+
+    if (flickeringSpotlight) {
+      flickeringSpotlight.pLight.intensity = 1.35 * flickerFactor;
+      flickeringSpotlight.coneMat.opacity = 0.85 * flickerFactor;
+      flickeringSpotlight.bulbMat.color.setHex(flickerFactor > 0.5 ? 0xffe082 : 0x5c4822);
+    }
+    waterUniforms.uFlicker.value = flickerFactor;
+
+    mothSwarms.forEach((swarm) => {
+      swarm.insects.forEach((bug) => {
+        const angle = elapsed * bug.speed + bug.phase;
+        bug.mesh.position.set(
+          Math.cos(angle) * bug.radius,
+          Math.sin(elapsed * bug.freqY + bug.phase) * bug.yAmp,
+          Math.sin(angle) * bug.radius
+        );
+        bug.mesh.lookAt(camera.position);
+      });
+    });
+
+    if (characterAnims.gamer) {
+      const { char, screenLight } = characterAnims.gamer;
+      char.leftArmPivot.rotation.x = -1.05 + Math.sin(elapsed * 14.0) * 0.08;
+      char.rightArmPivot.rotation.x = -1.05 + Math.cos(elapsed * 16.0) * 0.09;
+      char.rightArmPivot.rotation.z = Math.sin(elapsed * 10.0) * 0.06;
+      char.headGroup.rotation.y = Math.sin(elapsed * 2.5) * 0.12;
+      char.torso.rotation.x = 0.08 + Math.sin(elapsed * 3.2) * 0.03;
+      screenLight.intensity = 0.85 + Math.sin(elapsed * 18.0) * 0.15;
+    }
+
+    if (characterAnims.master) {
+      const { char } = characterAnims.master;
+      const sipWave = Math.max(0, Math.sin(elapsed * 1.1));
+      const sipCurve = Math.pow(sipWave, 3);
+      char.rightArmPivot.rotation.x = -0.65 - sipCurve * 1.15;
+      char.rightArmPivot.rotation.z = -sipCurve * 0.22;
+      char.headGroup.rotation.x = sipCurve * -0.18 + Math.sin(elapsed * 2.2) * 0.04;
+      char.headGroup.rotation.y = Math.sin(elapsed * 0.8) * 0.1;
+    }
+    teaSteamParticles.forEach((p) => {
+      const t = (elapsed * 0.45 + p.offset) % 1.0;
+      p.mesh.position.y = p.baseY + t * 0.55;
+      p.mesh.position.x = 0.18 + Math.sin(elapsed * 3.0 + p.offset * 6.0) * 0.04;
+      p.mesh.material.opacity = (1.0 - t) * 0.45;
+      p.mesh.scale.setScalar(0.8 + t * 0.9);
+    });
+
+    if (characterAnims.caller) {
+      const { char } = characterAnims.caller;
+      char.root.position.x = 0.28 + Math.sin(elapsed * 0.95) * 0.18;
+      char.root.rotation.y = -0.25 + Math.sin(elapsed * 1.2) * 0.28;
+      char.leftArmPivot.rotation.x = -0.45 + Math.sin(elapsed * 3.6) * 0.35;
+      char.leftArmPivot.rotation.z = 0.18 + Math.cos(elapsed * 2.8) * 0.15;
+      char.headGroup.rotation.z = Math.sin(elapsed * 2.1) * 0.06;
+    }
+
+    if (characterAnims.reader) {
+      const { char } = characterAnims.reader;
+      const pageTurn = Math.pow(Math.max(0, Math.sin(elapsed * 0.85)), 6);
+      char.rightArmPivot.rotation.x = -1.1 - pageTurn * 0.35;
+      char.rightArmPivot.rotation.y = pageTurn * 0.28;
+      char.headGroup.rotation.y = Math.sin(elapsed * 1.4) * 0.08;
+      char.headGroup.rotation.x = 0.28 + Math.sin(elapsed * 0.9) * 0.05;
+    }
+
+    if (characterAnims.dutyOfficer) {
+      const { char } = characterAnims.dutyOfficer;
+      char.headGroup.rotation.y = Math.sin(elapsed * 1.5) * 0.22;
+      char.rightArmPivot.rotation.x = -0.95 + Math.sin(elapsed * 5.0) * 0.08;
+    }
+
+    windowRainBeads.forEach((b) => {
+      b.y -= delta * b.speed;
+      if (b.y < -0.75) b.y = 0.75;
+      b.mesh.position.y = b.y;
+      b.mesh.position.x = b.baseX + Math.sin(b.y * 5.0 + b.wigglePhase) * 0.03;
+    });
+
+    const posArr = rainGeo.attributes.position.array;
+    for (let i = 0; i < rainCount; i++) {
+      const speed = rainVelocities[i] * delta;
+      posArr[i * 6 + 1] -= speed;
+      posArr[i * 6 + 4] -= speed;
+      posArr[i * 6] -= speed * 0.08;
+      posArr[i * 6 + 3] -= speed * 0.08;
+
+      if (posArr[i * 6 + 4] < -0.4) {
+        const ny = 22 + Math.random() * 4;
+        const nx = (Math.random() - 0.5) * 42;
+        const len = posArr[i * 6 + 1] - posArr[i * 6 + 4];
+        posArr[i * 6] = nx;
+        posArr[i * 6 + 1] = ny;
+        posArr[i * 6 + 3] = nx - 0.08;
+        posArr[i * 6 + 4] = ny - len;
+      }
+    }
+    rainGeo.attributes.position.needsUpdate = true;
+
+    eavesDrips.forEach((d) => {
+      d.progress = (d.progress + delta * d.speed) % 1.0;
+      if (d.progress < 0.72) {
+        const fallT = d.progress / 0.72;
+        d.dropMesh.position.y = THREE.MathUtils.lerp(d.startY, d.targetY, fallT * fallT);
+        d.dropMesh.visible = true;
+        d.splashRing.visible = false;
+      } else {
+        const ringT = (d.progress - 0.72) / 0.28;
+        d.dropMesh.visible = false;
+        d.splashRing.visible = true;
+        d.splashRing.scale.setScalar(0.6 + ringT * 2.4);
+        d.splashRing.material.opacity = (1.0 - ringT) * 0.65;
+      }
+    });
+
+    animatedFlags.forEach((f) => {
+      const pos = f.mesh.geometry.attributes.position;
+      const base = f.baseGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const bx = base.getX(i);
+        const by = base.getY(i);
+        const wave = Math.sin(bx * 5.0 - elapsed * 6.5 + f.phase) * (bx * 0.18);
+        pos.setZ(i, wave);
+        pos.setY(i, by + Math.cos(bx * 4.0 - elapsed * 5.0) * (bx * 0.04));
+      }
+      pos.needsUpdate = true;
+    });
+
+    // H13 3楼电水壶白烟蒸腾动画（仅在抽中且未整改时冒烟）
+    const h13Node = hazardSceneObjects['H13'];
+    if (h13Node && h13Node.badGroup.visible) {
+      kettleSmokePuffs.forEach((sp) => {
+        const st = (elapsed * 0.85 + sp.offset) % 1.0;
+        sp.mesh.position.y = sp.baseY + st * 0.35;
+        sp.mesh.position.x = Math.sin(elapsed * 4.0 + sp.offset * 8.0) * 0.035;
+        sp.mesh.scale.setScalar(0.7 + st * 1.5);
+        sp.mesh.material.opacity = (1.0 - st) * 0.65;
+      });
+    }
+
+    // H17 3楼外墙破损电线跳火动画（蓝色电弧与闪光）
+    const h17Node = hazardSceneObjects['H17'];
+    if (h17Node && h17Node.badGroup.visible) {
+      const isSparkFlicker = (elapsed * 24) % 3 < 1.2;
+      wireSparkLight.intensity = isSparkFlicker ? (1.5 + Math.random() * 2.5) : 0.05;
+      sparkParticles.forEach((p, idx) => {
+        p.mesh.visible = isSparkFlicker;
+        if (isSparkFlicker) {
+          const spread = Math.sin(elapsed * 30 + idx) * 0.12;
+          p.mesh.position.set(spread * p.speedX, spread * p.speedY, spread * p.speedZ);
+          p.mesh.scale.setScalar(0.5 + Math.random() * 1.2);
+        }
+      });
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  syncSceneHazards();
+  animate();
+
+  // 场景全部构建并启动渲染成功
+  window.__APP_STATUS__.sceneReady = true;
+  updateLoadingProgress(100, '✅ 3D场景引擎加载就绪，请选择难度！');
+  const spinner = document.getElementById('loading-spinner');
+  if (spinner) {
+    spinner.style.border = 'none';
+    spinner.textContent = '✅';
+  }
+  setTimeout(() => {
+    const wrap = document.getElementById('loading-bar-wrap');
+    if (wrap) wrap.style.opacity = '0.75';
+  }, 1000);
+
+  } catch (err) {
+    reportEngineError(err);
+  }
+};
+</script>
+</body>
+</html>
