@@ -698,6 +698,7 @@
     <button class="cam-chip" data-view="leftSide">🔌 左侧配电/前舱</button>
     <button class="cam-chip" data-view="floor2">🏠 二楼宿舍走廊</button>
     <button class="cam-chip" data-view="rightSide">🪜 右侧逃生梯道</button>
+    <button class="cam-chip" data-view="backSide">🔄 巡视船体背面</button>
   </div>
 
   <!-- 纯享观赏模式右上角返回按钮 -->
@@ -995,6 +996,39 @@ window.onload = function () {
       camTarget: new THREE.Vector3(-5.35, 7.2, 0.4),
       desc: '三楼会议室左侧外墙配电线路绝缘套管严重老化开裂破损，内部动力电缆铜线裸露在外，在雨水淋湿下持续剧烈跳出蓝色电火花，存在严重的金属船体漏电与电气起火爆炸危险。',
       rectify: '立即拉闸切断该路供电，拆除破损电线并重新穿设重型镀锌金属防雨穿线管，更换船用耐腐蚀交联阻燃电缆并加装漏电保护断路器。'
+    },
+    {
+      id: 'H18',
+      name: '后舱壁消防主供水管破损高压漏水',
+      stars: '⭐⭐ 中',
+      needEnter: '需绕到背面（一层后舱壁右侧）',
+      markerPos: new THREE.Vector3(4.2, 1.8, -3.85),
+      camPos: new THREE.Vector3(5.8, 3.2, -8.6),
+      camTarget: new THREE.Vector3(4.2, 1.45, -3.85),
+      desc: '绕至趸船背面可见：一层后舱壁红色消防供水主管路法兰接头密封垫老化破损，承压消防水呈强烈扇形向后甲板猛烈喷射泄漏，造成全船消防管网严重失压，且后通道大面积积水湿滑。',
+      rectify: '立即关闭上游消防管路隔离蝶阀，拆开法兰更换符合船检标准的耐腐蚀耐油橡胶垫片，对角均匀锁紧镀锌螺栓并试水保压至0.8MPa。'
+    },
+    {
+      id: 'H19',
+      name: '后甲板主系泊大缆严重磨损起毛开股',
+      stars: '⭐⭐ 中',
+      needEnter: '需绕到背面（一层后甲板左侧缆桩）',
+      markerPos: new THREE.Vector3(-9.2, 1.6, -4.85),
+      camPos: new THREE.Vector3(-11.2, 3.2, -9.5),
+      camTarget: new THREE.Vector3(-9.2, 1.15, -4.85),
+      desc: '绕至趸船背面后甲板左侧可见：受力主系泊大缆在穿过钢制导缆孔边缘处未包裹防磨帆布护套，受江流涌浪冲击摩擦已严重磨损起毛、超过三成编织股断裂，在雨夜受力下拉断风险极大，易致趸船走锚漂流。',
+      rectify: '立即启用备用缆绳分担受力，报废更换整根合格船用超高分子量聚乙烯系泊大缆，并在导缆孔接触摩擦点牢固绑扎加厚防磨帆布保护套。'
+    },
+    {
+      id: 'H20',
+      name: '二层后走廊易燃杂物堆放伴烟头阴燃',
+      stars: '⭐⭐⭐ 难',
+      needEnter: '需绕到背面（二楼后生活区走廊）',
+      markerPos: new THREE.Vector3(0.0, 4.3, -4.05),
+      camPos: new THREE.Vector3(0.0, 5.5, -8.5),
+      camTarget: new THREE.Vector3(0.0, 3.8, -4.05),
+      desc: '绕至二楼生活区后走廊可见：后门通道旁违规堆放了干燥包装纸箱与废旧化纤袋，杂物堆上方散落着未熄灭的烟头正在阴燃冒烟并有红热余烬，夜风吹拂极易引发外走廊与客舱火灾。',
+      rectify: '立即使用灭火器扑灭阴燃残火并彻底浇水冷却，全面清空二楼外走廊所有可燃堆积物；安装固定防风水封灭烟筒，严禁随手乱扔烟头。'
     }
   ];
 
@@ -1596,9 +1630,73 @@ window.onload = function () {
   rescuePole.position.set(-6.3, 2.15, f1CabinD / 2 + 0.08);
   floor1Group.add(rescuePole);
 
-  // 一层舱壁右侧《航道安全生产公示栏》
-  const boardSign = createToonBox(1.45, 0.85, 0.06, makeToonMat(0xffffff, {
-    map: createSignTexture('安全生产公示栏', '#eff6ff', '#1e40af', '#2563eb', 256, 128)
+  // 一层舱壁右侧《安全生产公示》三栏规范宣传栏（字号与边界严格自适应，杜绝超界溢出）
+  function createNoticeBoardTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 300;
+    const ctx = canvas.getContext('2d');
+
+    // 外边框与底色
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, 512, 300);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(8, 8, 496, 284);
+
+    // 顶部深蓝标题条
+    ctx.fillStyle = '#1e40af';
+    ctx.fillRect(12, 12, 488, 54);
+
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(12, 12, 488, 54);
+
+    // 标题文字：安全生产公示（带测量与边界保护）
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 30px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('安 全 生 产 公 示', 256, 39, 460);
+
+    // 下方三栏公示纸
+    const colW = 152;
+    const colH = 208;
+    const colY = 74;
+    const cols = [
+      { x: 18, title: '安全责任制', lines: ['● 全员落实岗位责任', '● 穿戴合格救生装备', '● 严禁酒后当班作业'] },
+      { x: 180, title: '应急值班公示', lines: ['● 24小时值守畅通', '● 遇险即刻拉响警报', '● 定期开展消防演练'] },
+      { x: 342, title: '巡查排查要点', lines: ['● 甲板防滑无积水', '● 消防器材无遮挡', '● 动力线路绝缘良好'] }
+    ];
+
+    cols.forEach(col => {
+      ctx.fillStyle = '#eff6ff';
+      ctx.fillRect(col.x, colY, colW, colH);
+      ctx.strokeStyle = '#bfdbfe';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(col.x, colY, colW, colH);
+
+      // 小标题条
+      ctx.fillStyle = '#2563eb';
+      ctx.fillRect(col.x, colY, colW, 28);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px "Microsoft YaHei", sans-serif';
+      ctx.fillText(col.title, col.x + colW / 2, colY + 14, colW - 10);
+
+      // 内容线条
+      ctx.fillStyle = '#334155';
+      ctx.font = '12px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left';
+      col.lines.forEach((l, idx) => {
+        ctx.fillText(l, col.x + 8, colY + 52 + idx * 36, colW - 16);
+      });
+    });
+
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  const boardSign = createToonBox(1.52, 0.90, 0.06, makeToonMat(0xffffff, {
+    map: createNoticeBoardTexture()
   }), 20);
   boardSign.position.set(6.3, 1.42, f1CabinD / 2 + 0.06);
   floor1Group.add(boardSign);
@@ -2311,17 +2409,28 @@ window.onload = function () {
   radarScanner.position.set(0, f3CabinH + 0.75, -1.3);
   floor3Group.add(radarScanner);
 
+  // 【修改点2】：3楼顶板舷灯方向纠正：红灯正对趸船背面（z = -2.6），绿灯保持正面右舷不动（z = 2.2）
   const portRedLight = new THREE.Mesh(
     new THREE.SphereGeometry(0.14, 10, 10),
     new THREE.MeshBasicMaterial({ color: 0xff2222 })
   );
-  portRedLight.position.set(-5.6, f3CabinH + 0.25, 2.2);
+  portRedLight.position.set(-5.6, f3CabinH + 0.25, -2.6); // 移至背面
+  const pRedBox = createToonBox(0.24, 0.32, 0.24, matHullDark, 10);
+  pRedBox.position.set(-5.6, f3CabinH + 0.16, -2.6);
+  const pRedGlow = new THREE.PointLight(0xff2222, 1.2, 5.0);
+  pRedGlow.position.set(-5.6, f3CabinH + 0.35, -2.6);
+
   const starboardGreenLight = new THREE.Mesh(
     new THREE.SphereGeometry(0.14, 10, 10),
     new THREE.MeshBasicMaterial({ color: 0x22ff55 })
   );
-  starboardGreenLight.position.set(5.6, f3CabinH + 0.25, 2.2);
-  floor3Group.add(portRedLight, starboardGreenLight);
+  starboardGreenLight.position.set(5.6, f3CabinH + 0.25, 2.2); // 保持正面不动
+  const sGreenBox = createToonBox(0.24, 0.32, 0.24, matHullDark, 10);
+  sGreenBox.position.set(5.6, f3CabinH + 0.16, 2.2);
+  const sGreenGlow = new THREE.PointLight(0x22ff55, 1.2, 5.0);
+  sGreenGlow.position.set(5.6, f3CabinH + 0.35, 2.2);
+
+  floor3Group.add(portRedLight, pRedBox, pRedGlow, starboardGreenLight, sGreenBox, sGreenGlow);
 
   // ----------------------------------------------------------------------------
   // 9. 前伸钢桁架引桥/栈桥
@@ -2533,33 +2642,81 @@ window.onload = function () {
   wudaoSign.position.set(9.1, 0.54, f3DeckD / 2 - 0.06);
   floor3Group.add(wudaoSign);
 
-  // 右侧连接一、二、三层的外部钢制斜梯
-  function createExteriorStairs(yBottom, height, xPos, zPos) {
+  // 【修改点3】：右侧连接一、二、三层外部钢制斜梯重构（紧贴右侧外舱壁，前后轴向无缝对齐，配合楼板正确开孔天井）
+  function buildZAlignedStairs(yBottom, height, xPos, zStart, zEnd, numSteps = 9) {
     const stairGroup = new THREE.Group();
-    stairGroup.position.set(xPos, yBottom, zPos);
+    const runZ = zEnd - zStart;
+    const len = Math.hypot(runZ, height);
+    const angleX = Math.atan2(height, Math.abs(runZ));
+    const stepDir = Math.sign(runZ);
 
-    const slope = Math.tan(0.45);
-    const totalDx = -slope * height;
-    const railLen = (height / Math.cos(0.45)) * 1.04;
+    stairGroup.position.set(xPos, yBottom, zStart);
 
-    [-0.30, 0.30].forEach(dz => {
-      const rail = createToonBox(0.06, railLen, 0.10, matHullDark, 20);
-      rail.position.set(totalDx / 2, height / 2, dz);
-      rail.rotation.z = 0.45;
-      stairGroup.add(rail);
+    // 左右两根倾斜梯梁（槽钢）
+    const stepW = 0.72;
+    const halfW = stepW / 2;
+    [-halfW, halfW].forEach(dx => {
+      const stringer = createToonBox(0.06, 0.14, len, matHullDark, 15);
+      stringer.position.set(dx, height / 2, runZ / 2);
+      stringer.rotation.x = stepDir * (Math.PI / 2 - angleX);
+      stairGroup.add(stringer);
+
+      // 外侧安全扶手与立柱
+      const handrail = createToonBox(0.04, 0.04, len, matYellowSafety, 10);
+      handrail.position.set(dx, height / 2 + 0.58, runZ / 2);
+      handrail.rotation.x = stepDir * (Math.PI / 2 - angleX);
+      stairGroup.add(handrail);
     });
 
-    for (let s = 1; s <= 7; s++) {
-      const t = s / 8;
-      const step = createToonBox(0.32, 0.05, 0.62, matSteelGrey, 20);
-      step.position.set(totalDx * t, t * height, 0);
+    // 防滑踏步板
+    for (let s = 1; s <= numSteps; s++) {
+      const t = s / (numSteps + 1);
+      const step = createToonBox(stepW - 0.04, 0.045, 0.26, matSteelGrey, 15);
+      step.position.set(0, t * height, t * runZ);
       stairGroup.add(step);
     }
     boatGroup.add(stairGroup);
     return stairGroup;
   }
-  createExteriorStairs(0.77, 2.5, 9.85, 1.3);
-  createExteriorStairs(3.27, 2.7, 9.65, 1.3);
+
+  // 1楼到2楼斜梯：紧贴1楼右舱壁（x = 9.82），自 z = -0.8 爬升至 2楼开孔平台 z = 1.6
+  buildZAlignedStairs(0.77, 2.50, 9.82, -0.8, 1.6, 9);
+
+  // 2楼到3楼斜梯：同轴紧密衔接，紧贴右走廊（x = 9.82），自 z = 1.6 爬升至 3楼顶板开孔平台 z = -0.8
+  buildZAlignedStairs(3.27, 2.70, 9.82, 1.6, -0.8, 10);
+
+  // 二楼与三楼对应楼板开孔井道与四周防坠挡脚围板
+  function buildStairOpeningWell(parent, floorY, wellX, wellZ, wellW, wellD) {
+    const wellGroup = new THREE.Group();
+    wellGroup.position.set(wellX, floorY, wellZ);
+
+    // 楼梯口开孔天井（黑色通道口）
+    const holeShaft = new THREE.Mesh(
+      new THREE.PlaneGeometry(wellW, wellD),
+      new THREE.MeshBasicMaterial({ color: 0x050b14, side: THREE.DoubleSide })
+    );
+    holeShaft.rotation.x = -Math.PI / 2;
+    holeShaft.position.y = 0.02;
+    wellGroup.add(holeShaft);
+
+    // 天井四周黄色安全防坠踢脚板（高度0.16m）
+    const borderT = 0.05;
+    const hFront = createToonBox(wellW, 0.16, borderT, matYellowSafety, 10);
+    hFront.position.set(0, 0.08, wellD / 2);
+    const hBack = createToonBox(wellW, 0.16, borderT, matYellowSafety, 10);
+    hBack.position.set(0, 0.08, -wellD / 2);
+    const hOuter = createToonBox(borderT, 0.16, wellD, matYellowSafety, 10);
+    hOuter.position.set(wellW / 2, 0.08, 0);
+
+    wellGroup.add(hFront, hBack, hOuter);
+    parent.add(wellGroup);
+  }
+
+  // 二楼右舷楼板开孔井（对齐1-2楼梯出口）
+  buildStairOpeningWell(floor2Group, 0.14, 9.82, 1.35, 0.88, 1.85);
+
+  // 三楼右舷楼板开孔井（对齐2-3楼梯出口）
+  buildStairOpeningWell(floor3Group, 0.12, 9.82, -0.65, 0.88, 1.85);
 
   // ----------------------------------------------------------------------------
   // 11. 船舷与甲板分区陈设（【修改点7】：已移除一楼前后军绿色帆布箱）
@@ -3231,17 +3388,26 @@ window.onload = function () {
     darkShaft.rotation.x = -Math.PI / 2;
     darkShaft.position.y = 0.05;
 
-    // 从底舱向上伸出的黄色铁爬梯（两根立管 + 3级横踏棍）
+    // 【修改点3-左侧梯】：紧贴前舱口内围壁安装的黄色铁爬梯（不再浮空），带固定支架与防滑踏棍
     const ladderGroup = new THREE.Group();
-    ladderGroup.position.set(0, 0.22, 0.35);
-    ladderGroup.rotation.x = -0.18;
-    [-0.22, 0.22].forEach((lx) => {
-      const rail = createToonBox(0.05, 0.65, 0.05, matYellowSafety, 20);
-      rail.position.set(lx, 0.1, 0);
+    // 舱口后壁内侧为 z = -0.58，爬梯紧密焊接在后壁上
+    ladderGroup.position.set(0, 0.15, -0.58);
+    ladderGroup.rotation.x = -0.05;
+    [-0.24, 0.24].forEach((lx) => {
+      // 扶手管上端探出围板 0.25m 供人握持
+      const rail = createToonBox(0.045, 0.78, 0.05, matYellowSafety, 20);
+      rail.position.set(lx, 0.15, 0);
       ladderGroup.add(rail);
+
+      // 固定焊接角钢支架
+      [-0.12, 0.18, 0.38].forEach((by) => {
+        const bracket = createToonBox(0.035, 0.035, 0.10, matHullDark, 10);
+        bracket.position.set(lx, by, -0.05);
+        ladderGroup.add(bracket);
+      });
     });
-    [-0.1, 0.12, 0.34].forEach((ly) => {
-      const rung = createToonBox(0.44, 0.04, 0.04, matYellowSafety, 20);
+    [-0.15, 0.05, 0.25, 0.45].forEach((ly) => {
+      const rung = createToonBox(0.48, 0.035, 0.035, matYellowSafety, 20);
       rung.position.set(0, ly, 0);
       ladderGroup.add(rung);
     });
@@ -3290,39 +3456,36 @@ window.onload = function () {
   }
 
   // --------------------------------------------------------------------------
-  // H12: 逃生梯道被占用（【修改点6】：油桶木箱对齐斜梯，安全逃生梯标牌直接挂在一楼右侧舱壁外墙上）
+  // H12: 逃生梯道被占用（【修改点3-标语】：安全逃生梯标牌常态直接贴在一楼右侧外墙上，一开始就存在；隐患仅为堆放杂物）
   // --------------------------------------------------------------------------
   {
-    const badG = new THREE.Group();
-    badG.position.set(9.25, 0.78, 1.3);
-
-    const oilDrum1 = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.78, 16), makeToonMat(0xb91c1c));
-    oilDrum1.position.set(0.35, 0.39, 0.0);
-    addOutline(oilDrum1, 20);
-
-    const oilDrum2 = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.72, 16), makeToonMat(0x1d4ed8));
-    oilDrum2.position.set(0.02, 0.95, 0.02);
-    oilDrum2.rotation.z = 0.25;
-    addOutline(oilDrum2, 20);
-
-    const blockingBox = createToonBox(0.58, 0.48, 0.52, matLightWood, 20);
-    blockingBox.position.set(-0.28, 1.48, 0.0);
-    blockingBox.rotation.y = 0.2;
-
-    badG.add(oilDrum1, oilDrum2, blockingBox);
-    boatGroup.add(badG);
-
-    // 合规状态：标牌平贴挂在一楼右侧舱壁外墙上（x = 9.43），完全不与楼梯重叠
-    const safeG = new THREE.Group();
-    const exitSign = createToonBox(0.82, 0.36, 0.04, makeToonMat(0xffffff, {
-      map: createSignTexture('安全逃生梯', '#15803d', '#ffffff', '#86efac', 192, 80)
+    // 常态化标识牌：一开始就挂在一楼右侧舱壁上，绝非点击后才出现！
+    const permExitSign = createToonBox(0.06, 0.55, 1.22, makeToonMat(0xffffff, {
+      map: createSignTexture('安全逃生梯', '#047857', '#ecfdf5', '#10b981', 256, 110)
     }), 20);
-    exitSign.position.set(9.43, 2.35, 0.2);
-    exitSign.rotation.y = Math.PI / 2;
-    safeG.add(exitSign);
-    boatGroup.add(safeG);
+    permExitSign.position.set(9.43, 2.05, -0.85);
+    boatGroup.add(permExitSign);
 
-    registerHazardNode('H12', badG, safeG, new THREE.Vector3(9.35, 2.0, 1.3), new THREE.Vector3(1.8, 2.4, 1.5));
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    boatGroup.add(badG, safeG);
+
+    // 隐患状态：逃生斜梯梯脚处堆放机油桶、木箱阻死通道
+    const blockPos = new THREE.Vector3(9.82, 0.77, -0.8);
+    const drum1 = createOilDrum(0.35, 0.85, 0xdc2626);
+    drum1.position.set(blockPos.x - 0.05, blockPos.y + 0.42, blockPos.z + 0.15);
+    const drum2 = createOilDrum(0.32, 0.78, 0x2563eb);
+    drum2.position.set(blockPos.x + 0.15, blockPos.y + 0.39, blockPos.z - 0.25);
+    const crate = createToonBox(0.58, 0.48, 0.48, makeToonMat(0xb45309), 20);
+    crate.position.set(blockPos.x - 0.08, blockPos.y + 0.24, blockPos.z - 0.22);
+    badG.add(drum1, drum2, crate);
+
+    // 合规状态：通道畅通，地面涂刷黄黑警示反光逃生禁停禁放线框
+    const safeLine = createToonBox(0.85, 0.02, 1.1, matHazard, 10);
+    safeLine.position.set(blockPos.x, 0.78, blockPos.z);
+    safeG.add(safeLine);
+
+    registerHazardNode('H12', badG, safeG, new THREE.Vector3(9.82, 1.9, -0.8), new THREE.Vector3(1.8, 1.8, 1.8));
   }
 
   // --------------------------------------------------------------------------
@@ -3488,46 +3651,38 @@ window.onload = function () {
   }
 
   // --------------------------------------------------------------------------
-  // H16: 1层侧面增加“太平斧”标语，增加太平斧缺失的隐患
+  // H16: 1层侧面增加“太平斧”标语，增加太平斧缺失的隐患（标牌常态在墙，隐患表现为缺失）
   // --------------------------------------------------------------------------
   {
-    const badG = new THREE.Group();
-    const safeG = new THREE.Group();
-    boatGroup.add(badG, safeG);
-
     const rackPosX = 9.43;
     const rackPosY = 1.95;
-    const rackPosZ = -1.2;
+    const rackPosZ = -1.95;
 
-    // 标语红色底板
+    // 常态化标识：红色底板、“太平斧专用位”标语牌与挂架常态挂在一楼右舱壁外侧，一开始就在墙上！
     const rackPlate = createToonBox(0.06, 1.25, 1.45, makeToonMat(0x991b1b), 16);
     rackPlate.position.set(rackPosX, rackPosY, rackPosZ);
 
-    // 醒目“应急破拆 · 太平斧”反光标语牌
     const axeSign = createToonBox(0.07, 0.42, 1.35, makeToonMat(0xffffff, {
       map: createSignTexture('太平斧专用位', '#dc2626', '#fef08a', '#fbbf24', 256, 85)
     }), 16);
     axeSign.position.set(rackPosX + 0.01, rackPosY + 0.38, rackPosZ);
 
-    // 左右两个U型挂架
     const hookL = createToonBox(0.14, 0.06, 0.08, matSteelGrey, 10);
     hookL.position.set(rackPosX + 0.05, rackPosY - 0.08, rackPosZ - 0.32);
     const hookR = createToonBox(0.14, 0.06, 0.08, matSteelGrey, 10);
     hookR.position.set(rackPosX + 0.05, rackPosY - 0.08, rackPosZ + 0.32);
+    boatGroup.add(rackPlate, axeSign, hookL, hookR);
 
-    // 隐患状态：挂架上空无一物（太平斧缺失），并悬挂断裂封条
-    badG.add(rackPlate, axeSign, hookL, hookR);
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    boatGroup.add(badG, safeG);
+
+    // 隐患状态：挂架空置，太平斧被违规挪走缺失，挂架上残留断裂铅封
     const brokenSeal = createToonBox(0.04, 0.18, 0.03, makeToonMat(0xfacc15), 8);
     brokenSeal.position.set(rackPosX + 0.06, rackPosY - 0.15, rackPosZ);
     badG.add(brokenSeal);
 
-    // 合规状态：底板挂架上稳妥悬挂标准船用消防太平斧
-    const safePlate = rackPlate.clone();
-    const safeSign = axeSign.clone();
-    const safeHookL = hookL.clone();
-    const safeHookR = hookR.clone();
-
-    // 太平斧：实木长柄 + 红色精钢斧头与反向破拆尖锥
+    // 合规状态：太平斧牢固挂在挂钩上
     const axeGroup = new THREE.Group();
     axeGroup.position.set(rackPosX + 0.08, rackPosY - 0.05, rackPosZ);
 
@@ -3540,10 +3695,9 @@ window.onload = function () {
     const axePick = createToonBox(0.06, 0.08, 0.16, matSteelGrey, 12);
     axePick.position.set(0.0, 0.04, -0.48);
     axeGroup.add(axeHead, axePick);
+    safeG.add(axeGroup);
 
-    safeG.add(safePlate, safeSign, safeHookL, safeHookR, axeGroup);
-
-    registerHazardNode('H16', badG, safeG, new THREE.Vector3(9.43, 1.95, -1.2), new THREE.Vector3(1.6, 1.6, 1.6));
+    registerHazardNode('H16', badG, safeG, new THREE.Vector3(9.43, 1.95, -1.95), new THREE.Vector3(1.6, 1.6, 1.6));
   }
 
   // --------------------------------------------------------------------------
@@ -3602,6 +3756,199 @@ window.onload = function () {
     safeG.add(safeSteelPipe, junctionBox, safetyTag);
 
     registerHazardNode('H17', badG, safeG, new THREE.Vector3(-5.35, 7.17, -0.1), new THREE.Vector3(1.6, 1.6, 1.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // H18: 背面一层消防水管漏水喷水隐患（用户指定背面隐患）
+  // --------------------------------------------------------------------------
+  const leakWaterParticles = [];
+  {
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    floor1Group.add(badG, safeG);
+
+    // 位于一层后舱壁靠右侧 (x = 4.2, y = 1.35, z = -f1CabinD/2 - 0.08 = -3.38)
+    const pipeX = 4.2;
+    const pipeY = 1.25;
+    const pipeZ = -f1CabinD / 2 - 0.06;
+
+    // 常态消防水管主管路（红色钢管沿后壁走线）
+    const mainPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 2.3, 12), matFireRed);
+    mainPipe.position.set(pipeX, pipeY, pipeZ);
+    floor1Group.add(mainPipe);
+
+    const pipeSign = createToonBox(0.42, 0.16, 0.04, makeToonMat(0xffffff, {
+      map: createSignTexture('消防主供水', '#dc2626', '#ffffff', '#ffffff', 140, 60)
+    }), 10);
+    pipeSign.position.set(pipeX + 0.35, pipeY + 0.45, pipeZ);
+    floor1Group.add(pipeSign);
+
+    // 隐患状态：法兰盘开裂破损，承压水呈强烈扇形朝后方激射喷出！后甲板出现大片反光积水
+    const flangeBad = createToonBox(0.18, 0.08, 0.18, matSteelGrey, 12);
+    flangeBad.position.set(pipeX, pipeY, pipeZ);
+    const brokenGasket = createToonBox(0.19, 0.02, 0.19, makeToonMat(0x0f172a), 10);
+    brokenGasket.position.set(pipeX, pipeY, pipeZ);
+    brokenGasket.rotation.z = 0.25;
+
+    // 喷水水花粒子群（扇形喷射）
+    const sprayGroup = new THREE.Group();
+    sprayGroup.position.set(pipeX, pipeY, pipeZ - 0.08);
+    for (let i = 0; i < 14; i++) {
+      const drop = new THREE.Mesh(
+        new THREE.SphereGeometry(0.035, 6, 6),
+        new THREE.MeshBasicMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.75 })
+      );
+      sprayGroup.add(drop);
+      leakWaterParticles.push({
+        mesh: drop,
+        vx: (Math.random() - 0.5) * 0.45,
+        vy: (Math.random() - 0.5) * 0.35 - 0.2,
+        vz: -0.6 - Math.random() * 0.75,
+        baseY: 0
+      });
+    }
+
+    // 后甲板积水滩
+    const puddle = new THREE.Mesh(
+      new THREE.CircleGeometry(0.85, 16),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.52, depthWrite: false })
+    );
+    puddle.rotation.x = -Math.PI / 2;
+    puddle.position.set(pipeX, 0.02, pipeZ - 0.65);
+
+    badG.add(flangeBad, brokenGasket, sprayGroup, puddle);
+
+    // 合规状态：法兰螺栓紧固完好，带压力表处于0.8MPa正常绿区，甲板干爽
+    const flangeSafe = createToonBox(0.18, 0.08, 0.18, matSteelGrey, 12);
+    flangeSafe.position.set(pipeX, pipeY, pipeZ);
+    const pressureGauge = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.09, 0.05, 16),
+      makeToonMat(0xffffff, {
+        map: createSignTexture('0.8MPa', '#059669', '#ecfdf5', '#10b981', 128, 64)
+      })
+    );
+    pressureGauge.rotation.x = Math.PI / 2;
+    pressureGauge.position.set(pipeX + 0.14, pipeY + 0.12, pipeZ);
+    safeG.add(flangeSafe, pressureGauge);
+
+    registerHazardNode('H18', badG, safeG, new THREE.Vector3(pipeX, 1.75, -4.35), new THREE.Vector3(1.6, 1.8, 1.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // H19: 趸船背面后甲板受力主系泊大缆严重磨损起毛开股
+  // --------------------------------------------------------------------------
+  {
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    boatGroup.add(badG, safeG);
+
+    // 位于一层后甲板左侧 (x = -9.2, y = 0.77, z = -4.75)
+    const bittX = -9.2;
+    const bittY = 0.77;
+    const bittZ = -4.75;
+
+    // 常态后甲板大型双柱钢制系缆桩
+    const bittGroup = new THREE.Group();
+    bittGroup.position.set(bittX, bittY, bittZ);
+    const bittBase = createToonBox(0.85, 0.10, 0.45, matHullDark, 12);
+    bittBase.position.y = 0.05;
+    bittGroup.add(bittBase);
+    [-0.22, 0.22].forEach(bx => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.09, 0.48, 12), matHullDark);
+      post.position.set(bx, 0.28, 0);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 12), matHullDark);
+      cap.position.set(bx, 0.52, 0);
+      bittGroup.add(post, cap);
+    });
+    boatGroup.add(bittGroup);
+
+    // 隐患状态：大缆在通过导缆孔处受力磨损严重起毛、断股炸开、无防磨套
+    const badRope = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.85, 10), makeToonMat(0xa8a29e));
+    badRope.rotation.x = 1.35;
+    badRope.position.set(bittX, bittY + 0.28, bittZ - 0.75);
+
+    // 严重起毛开股的蓬乱纤维群（鸟巢状破损）
+    const frayCluster = new THREE.Group();
+    frayCluster.position.set(bittX, bittY + 0.25, bittZ - 0.55);
+    for (let f = 0; f < 8; f++) {
+      const strand = createToonBox(0.03, 0.14, 0.03, makeToonMat(0x78716c), 8);
+      strand.position.set((Math.random() - 0.5) * 0.14, (Math.random() - 0.5) * 0.14, (Math.random() - 0.5) * 0.14);
+      strand.rotation.set(Math.random() * 2, Math.random() * 2, Math.random() * 2);
+      frayCluster.add(strand);
+    }
+    badG.add(badRope, frayCluster);
+
+    // 合规状态：大缆光洁坚韧，且在接触受力处包裹黄黑相间帆布防磨套管
+    const safeRope = badRope.clone();
+    const chafeSleeve = createToonBox(0.13, 0.13, 0.45, matHazard, 12);
+    chafeSleeve.rotation.x = 1.35;
+    chafeSleeve.position.set(bittX, bittY + 0.25, bittZ - 0.55);
+    safeG.add(safeRope, chafeSleeve);
+
+    registerHazardNode('H19', badG, safeG, new THREE.Vector3(bittX, 1.25, bittZ), new THREE.Vector3(1.6, 1.6, 1.6));
+  }
+
+  // --------------------------------------------------------------------------
+  // H20: 二层生活区后走廊易燃杂物堆放伴烟头阴燃冒烟
+  // --------------------------------------------------------------------------
+  const cigaretteSmokeParticles = [];
+  let cigaretteEmberLight = null;
+  {
+    const badG = new THREE.Group();
+    const safeG = new THREE.Group();
+    floor2Group.add(badG, safeG);
+
+    // 位于二楼后走廊立柱旁 (x = 0.0, y = 0.14, z = -f2CabinD / 2 - 0.25 = -3.05)
+    const posX = 0.0;
+    const posY = 0.14;
+    const posZ = -f2CabinD / 2 - 0.25;
+
+    // 隐患状态：干纸箱杂物堆叠，纸箱上方散落未熄灭的烟头正在阴燃冒烟
+    const box1 = createToonBox(0.62, 0.45, 0.52, makeToonMat(0xb45309), 15);
+    box1.position.set(posX - 0.18, posY + 0.22, posZ);
+    const box2 = createToonBox(0.48, 0.38, 0.42, makeToonMat(0xd97706), 15);
+    box2.position.set(posX + 0.22, posY + 0.19, posZ + 0.05);
+
+    // 烟头与阴燃红星
+    const cigButt = createToonBox(0.04, 0.02, 0.12, makeToonMat(0xf8fafc), 8);
+    cigButt.position.set(posX - 0.12, posY + 0.46, posZ);
+    const ember = new THREE.Mesh(
+      new THREE.SphereGeometry(0.022, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xff3b30 })
+    );
+    ember.position.set(posX - 0.12, posY + 0.46, posZ + 0.06);
+
+    cigaretteEmberLight = new THREE.PointLight(0xff4500, 0.85, 2.5);
+    cigaretteEmberLight.position.set(posX - 0.12, posY + 0.52, posZ + 0.06);
+
+    // 阴燃青烟粒子群
+    const smokeGroup = new THREE.Group();
+    smokeGroup.position.set(posX - 0.12, posY + 0.50, posZ + 0.06);
+    for (let s = 0; s < 6; s++) {
+      const p = new THREE.Mesh(
+        new THREE.SphereGeometry(0.045, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.55 })
+      );
+      smokeGroup.add(p);
+      cigaretteSmokeParticles.push({
+        mesh: p,
+        offset: s * 0.18,
+        baseY: s * 0.08
+      });
+    }
+
+    badG.add(box1, box2, cigButt, ember, cigaretteEmberLight, smokeGroup);
+
+    // 合规状态：走廊整洁，立柱上安装不锈钢水封壁挂灭烟筒与禁烟标识
+    const ashtray = createToonBox(0.18, 0.32, 0.12, matSteelGrey, 12);
+    ashtray.position.set(posX, posY + 0.85, posZ + 0.18);
+    const noSmokeSign = createToonBox(0.38, 0.22, 0.04, makeToonMat(0xffffff, {
+      map: createSignTexture('生活区禁烟', '#dc2626', '#ffffff', '#ffffff', 160, 80)
+    }), 10);
+    noSmokeSign.position.set(posX, posY + 1.15, posZ + 0.18);
+    safeG.add(ashtray, noSmokeSign);
+
+    registerHazardNode('H20', badG, safeG, new THREE.Vector3(posX, 3.8, -3.55), new THREE.Vector3(1.6, 1.6, 1.6));
   }
 
   // --------------------------------------------------------------------------
@@ -4044,7 +4391,8 @@ window.onload = function () {
     deck1: { pos: new THREE.Vector3(0.0, 4.8, 13.5), target: new THREE.Vector3(0, 1.4, 2.8) },
     leftSide: { pos: new THREE.Vector3(-18.5, 5.2, 5.5), target: new THREE.Vector3(-10.2, 1.6, 1.2) },
     floor2: { pos: new THREE.Vector3(0.0, 5.5, 11.2), target: new THREE.Vector3(0, 3.8, 2.4) },
-    rightSide: { pos: new THREE.Vector3(17.8, 4.8, 5.5), target: new THREE.Vector3(9.4, 2.0, 1.1) }
+    rightSide: { pos: new THREE.Vector3(16.5, 4.2, 0.5), target: new THREE.Vector3(9.8, 2.2, 0.5) },
+    backSide: { pos: new THREE.Vector3(0.0, 6.2, -14.2), target: new THREE.Vector3(0.0, 2.2, -3.8) }
   };
 
   document.querySelectorAll('.cam-chip').forEach((chip) => {
@@ -4320,6 +4668,32 @@ window.onload = function () {
           p.mesh.position.set(spread * p.speedX, spread * p.speedY, spread * p.speedZ);
           p.mesh.scale.setScalar(0.5 + Math.random() * 1.2);
         }
+      });
+    }
+
+    // H18 背面消防水管高压喷溅动画
+    const h18Node = hazardSceneObjects['H18'];
+    if (h18Node && h18Node.badGroup.visible) {
+      leakWaterParticles.forEach((drop) => {
+        drop.mesh.position.z += drop.vz * delta * 4.5;
+        drop.mesh.position.x += drop.vx * delta * 2.5;
+        drop.mesh.position.y += drop.vy * delta * 3.5;
+        if (drop.mesh.position.z < -1.8 || drop.mesh.position.y < -1.2) {
+          drop.mesh.position.set(0, 0, 0);
+        }
+      });
+    }
+
+    // H20 二楼后走廊未熄灭烟头阴燃火光闪烁与青烟动画
+    const h20Node = hazardSceneObjects['H20'];
+    if (h20Node && h20Node.badGroup.visible) {
+      cigaretteEmberLight.intensity = 0.55 + Math.sin(elapsed * 6.5) * 0.35 + Math.random() * 0.15;
+      cigaretteSmokeParticles.forEach((sp) => {
+        const st = (elapsed * 0.55 + sp.offset) % 1.0;
+        sp.mesh.position.y = sp.baseY + st * 0.42;
+        sp.mesh.position.x = Math.sin(elapsed * 3.2 + sp.offset * 6.0) * 0.025;
+        sp.mesh.scale.setScalar(0.6 + st * 1.6);
+        sp.mesh.material.opacity = (1.0 - st) * 0.55;
       });
     }
 
