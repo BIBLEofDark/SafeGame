@@ -2642,6 +2642,32 @@ window.onload = function () {
   wudaoSign.position.set(9.1, 0.54, f3DeckD / 2 - 0.06);
   floor3Group.add(wudaoSign);
 
+  // 标准化油桶模型生成器（常用于通道堵塞、危险品隐患展示）
+  function createOilDrum(radius = 0.35, height = 0.85, color = 0xdc2626) {
+    const drumGroup = new THREE.Group();
+    const drumMat = makeToonMat(color);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 18), drumMat);
+    addOutline(body, 20);
+    drumGroup.add(body);
+
+    const rimMat = makeToonMat(0x1e293b);
+    [-height * 0.25, height * 0.25].forEach((ry) => {
+      const rib = new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.03, radius * 1.03, height * 0.04, 18), rimMat);
+      rib.position.y = ry;
+      drumGroup.add(rib);
+    });
+    [-height * 0.48, height * 0.48].forEach((ry) => {
+      const chime = new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.04, radius * 1.04, height * 0.035, 18), rimMat);
+      chime.position.y = ry;
+      drumGroup.add(chime);
+    });
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.16, radius * 0.16, 0.03, 10), rimMat);
+    cap.position.set(radius * 0.45, height * 0.51, 0);
+    drumGroup.add(cap);
+
+    return drumGroup;
+  }
+
   // 【修改点3】：右侧连接一、二、三层外部钢制斜梯重构（紧贴右侧外舱壁，前后轴向无缝对齐，配合楼板正确开孔天井）
   function buildZAlignedStairs(yBottom, height, xPos, zStart, zEnd, numSteps = 9) {
     const stairGroup = new THREE.Group();
