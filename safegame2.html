@@ -375,6 +375,7 @@
       transition: width 0.35s ease;
     }
     .load-error-box {
+      display: none;
       background: rgba(127, 29, 29, 0.88);
       border: 1px solid #f87171;
       border-radius: 10px;
@@ -384,6 +385,12 @@
       font-size: 12px;
       text-align: center;
       line-height: 1.5;
+    }
+    .load-error-box:not(.hidden) {
+      display: block;
+    }
+    .hidden {
+      display: none !important;
     }
     .retry-btn {
       margin-top: 8px;
@@ -659,8 +666,19 @@
           (detail ? '<br/><span style="font-size:12px;color:#fca5a5;">' + detail + '</span>' : '') +
           '<br/><span style="font-size:11px;color:#cbd5e1;">' + tip + '</span>';
       }
-      if (errBox) errBox.classList.remove('hidden');
+      if (errBox) {
+        errBox.style.display = 'block';
+        errBox.classList.remove('hidden');
+      }
     }
+
+    window.retryInitEngine = function() {
+      if (typeof initEngine === 'function') {
+        initEngine();
+      } else {
+        location.reload();
+      }
+    };
 
     // 检测 WebGL 硬件加速
     function checkWebGLSupport() {
@@ -1809,10 +1827,10 @@
           <div id="loading-bar" class="progress-fill" style="width: 25%;"></div>
         </div>
       </div>
-      <div id="loading-error-box" class="load-error-box hidden">
-        <div id="loading-error-msg">⚠️ 3D引擎网络资源加载受阻，请检查网络连接！</div>
+      <div id="loading-error-box" class="load-error-box hidden" style="display: none;">
+        <div id="loading-error-msg">⚠️ 3D引擎初始化异常，请点击重试或刷新页面</div>
         <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;">
-          <button id="btn-retry-load" class="retry-btn" onclick="retryInitEngine();">🔄 切换镜像重试</button>
+          <button id="btn-retry-load" class="retry-btn" onclick="retryInitEngine();">🔄 重新初始化引擎</button>
           <button class="retry-btn" style="background:#334155;" onclick="location.reload();">🔄 刷新页面</button>
         </div>
       </div>
@@ -1937,7 +1955,10 @@
 
   function initEngine() {
     const errBox = document.getElementById('loading-error-box');
-    if (errBox) errBox.classList.add('hidden');
+    if (errBox) {
+      errBox.style.display = 'none';
+      errBox.classList.add('hidden');
+    }
     const spinner = document.getElementById('loading-spinner');
     if (spinner) {
       spinner.style.display = 'inline-block';
@@ -5905,19 +5926,6 @@
   window.startNewGame = startNewGame;
   window.enterFreeViewMode = enterFreeViewMode;
   window.showToast = showGlobalToast;
-
-  // 场景全部构建并启动渲染成功
-  window.__APP_STATUS__.sceneReady = true;
-  updateLoadingProgress(100, '✅ 3D场景引擎加载就绪，请选择难度！');
-  const spinner = document.getElementById('loading-spinner');
-  if (spinner) {
-    spinner.style.border = 'none';
-    spinner.textContent = '✅';
-  }
-  setTimeout(() => {
-    const wrap = document.getElementById('loading-bar-wrap');
-    if (wrap) wrap.style.opacity = '0.75';
-  }, 1000);
 
   } catch (err) {
     reportEngineError(err);
